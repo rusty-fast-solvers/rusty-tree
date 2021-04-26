@@ -3,7 +3,7 @@
 use ndarray::{Array1, ArrayView1, Zip};
 use rusty_kernel_tools::RealType;
 
-const X_LOOKUP_ENCODE: [u64; 256] = [
+const X_LOOKUP_ENCODE: [usize; 256] = [
     0x00000000, 0x00000001, 0x00000008, 0x00000009, 0x00000040, 0x00000041, 0x00000048, 0x00000049,
     0x00000200, 0x00000201, 0x00000208, 0x00000209, 0x00000240, 0x00000241, 0x00000248, 0x00000249,
     0x00001000, 0x00001001, 0x00001008, 0x00001009, 0x00001040, 0x00001041, 0x00001048, 0x00001049,
@@ -38,7 +38,7 @@ const X_LOOKUP_ENCODE: [u64; 256] = [
     0x00249200, 0x00249201, 0x00249208, 0x00249209, 0x00249240, 0x00249241, 0x00249248, 0x00249249,
 ];
 
-const Y_LOOKUP_ENCODE: [u64; 256] = [
+const Y_LOOKUP_ENCODE: [usize; 256] = [
     0x00000000, 0x00000002, 0x00000010, 0x00000012, 0x00000080, 0x00000082, 0x00000090, 0x00000092,
     0x00000400, 0x00000402, 0x00000410, 0x00000412, 0x00000480, 0x00000482, 0x00000490, 0x00000492,
     0x00002000, 0x00002002, 0x00002010, 0x00002012, 0x00002080, 0x00002082, 0x00002090, 0x00002092,
@@ -73,7 +73,7 @@ const Y_LOOKUP_ENCODE: [u64; 256] = [
     0x00492400, 0x00492402, 0x00492410, 0x00492412, 0x00492480, 0x00492482, 0x00492490, 0x00492492,
 ];
 
-const Z_LOOKUP_ENCODE: [u64; 256] = [
+const Z_LOOKUP_ENCODE: [usize; 256] = [
     0x00000000, 0x00000004, 0x00000020, 0x00000024, 0x00000100, 0x00000104, 0x00000120, 0x00000124,
     0x00000800, 0x00000804, 0x00000820, 0x00000824, 0x00000900, 0x00000904, 0x00000920, 0x00000924,
     0x00004000, 0x00004004, 0x00004020, 0x00004024, 0x00004100, 0x00004104, 0x00004120, 0x00004124,
@@ -108,7 +108,7 @@ const Z_LOOKUP_ENCODE: [u64; 256] = [
     0x00924800, 0x00924804, 0x00924820, 0x00924824, 0x00924900, 0x00924904, 0x00924920, 0x00924924,
 ];
 
-const X_LOOKUP_DECODE: [u64; 512] = [
+const X_LOOKUP_DECODE: [usize; 512] = [
     0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3, 0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3,
     0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3, 0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3,
     4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7,
@@ -127,7 +127,7 @@ const X_LOOKUP_DECODE: [u64; 512] = [
     4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7,
 ];
 
-const Y_LOOKUP_DECODE: [u64; 512] = [
+const Y_LOOKUP_DECODE: [usize; 512] = [
     0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3,
     0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3,
     0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3,
@@ -146,7 +146,7 @@ const Y_LOOKUP_DECODE: [u64; 512] = [
     4, 4, 5, 5, 4, 4, 5, 5, 4, 4, 5, 5, 4, 4, 5, 5, 6, 6, 7, 7, 6, 6, 7, 7, 6, 6, 7, 7, 6, 6, 7, 7,
 ];
 
-const Z_LOOKUP_DECODE: [u64; 512] = [
+const Z_LOOKUP_DECODE: [usize; 512] = [
     0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1,
     2, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3,
     0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1,
@@ -166,37 +166,37 @@ const Z_LOOKUP_DECODE: [u64; 512] = [
 ];
 
 // Number of bits used for Level information
-const LEVEL_DISPLACEMENT: u64 = 15;
+const LEVEL_DISPLACEMENT: usize = 15;
 
 // Mask for the last 15 bits
-const LEVEL_MASK: u64 = 0x7FFF;
+const LEVEL_MASK: usize = 0x7FFF;
 
 // Mask for lowest order byte
-const BYTE_MASK: u64 = 0xFF;
-const BYTE_DISPLACEMENT: u64 = 8;
+const BYTE_MASK: usize = 0xFF;
+const BYTE_DISPLACEMENT: usize = 8;
 
 // Mask for lowest order index bits
-const LOWEST_ORDER_MASK: u64 = 0x7;
+const LOWEST_ORDER_MASK: usize = 0x7;
 
 // Mask encapsulating a bit
-const NINE_BIT_MASK: u64 = 0x1FF;
+const NINE_BIT_MASK: usize = 0x1FF;
 
 // Masks for coordinate bits along specific axes in a int64 Morton Key
-const X_MASK: u64 = 0b001001001001001001001001001001001001001001001001;
-const Y_MASK: u64 = 0b010010010010010010010010010010010010010010010010;
-const Z_MASK: u64 = 0b100100100100100100100100100100100100100100100100;
+const X_MASK: usize = 0b001001001001001001001001001001001001001001001001;
+const Y_MASK: usize = 0b010010010010010010010010010010010010010010010010;
+const Z_MASK: usize = 0b100100100100100100100100100100100100100100100100;
 
-const YZ_MASK: u64 = 0b110110110110110110110110110110110110110110110110;
-const XZ_MASK: u64 = 0b101101101101101101101101101101101101101101101101;
-const XY_MASK: u64 = 0b011011011011011011011011011011011011011011011011;
+const YZ_MASK: usize = 0b110110110110110110110110110110110110110110110110;
+const XZ_MASK: usize = 0b101101101101101101101101101101101101101101101101;
+const XY_MASK: usize = 0b011011011011011011011011011011011011011011011011;
 
 /// Return the level associated with a key.
-pub fn find_level(key: u64) -> u64 {
+pub fn find_level(key: usize) -> usize {
     return key & LEVEL_MASK;
 }
 
 /// Map a point to the integer coordinates of its enclosing box.
-/// 
+///
 /// Returns the 3 integeger coordinates of the enclosing box.
 ///
 /// # Arguments
@@ -206,21 +206,58 @@ pub fn find_level(key: u64) -> u64 {
 /// `tree_radius` - The radius of the octree.
 pub fn point_to_box_coordinates(
     point: &[f64; 3],
-    level: u64,
+    level: usize,
     tree_center: f64,
     tree_radius: f64,
-) -> [u64; 4] {
-    let mut anchor: [u64; 4] = [0, 0, 0, 0];
+) -> [usize; 4] {
+    let mut anchor: [usize; 4] = [0, 0, 0, 0];
     anchor[3] = level;
 
     let xmin = tree_center - tree_radius;
     let side_length = 2.0 * tree_radius / ((1 << level) as f64);
 
     for (anchor_value, &point_value) in anchor.iter_mut().zip(point.iter()) {
-        *anchor_value = ((point_value - xmin) / side_length).floor() as u64;
+        *anchor_value = ((point_value - xmin) / side_length).floor() as usize;
     }
-
     anchor
 }
 
+/// Encode an anchor.
+///
+/// Returns the Morton key associated with the given anchor.
+///
+/// # Arguments
+/// `anchor` - A vector with 4 elements defining the integer coordinates and level.
+pub fn encode_anchor(anchor: &[usize; 4]) -> usize {
+    let x = anchor[0];
+    let y = anchor[1];
+    let z = anchor[2];
+    let level = anchor[3];
+
+    let key: usize = Z_LOOKUP_ENCODE[(z >> BYTE_DISPLACEMENT) & BYTE_MASK]
+        | Y_LOOKUP_ENCODE[(y >> BYTE_DISPLACEMENT) & BYTE_MASK]
+        | X_LOOKUP_ENCODE[(x >> BYTE_DISPLACEMENT) & BYTE_MASK];
+
+    let key = (key << 24)
+        | Z_LOOKUP_ENCODE[z & BYTE_MASK]
+        | Y_LOOKUP_ENCODE[y & BYTE_MASK]
+        | X_LOOKUP_ENCODE[x & BYTE_MASK];
+
+    let key = key << LEVEL_DISPLACEMENT;
+    key | level
+}
+
+/// Encode a point.
+///
+/// Return the Morton key of a point for a given level.
+///
+/// # Arguments
+/// `point` - The (x, y, z) coordinates of the point to map.
+/// `level` - The level of the tree at which the point will be mapped.
+/// `tree_center` - The center of the octree.
+/// `tree_radius` - The radius of the octree.
+pub fn encode_point(point: &[f64; 3], level: usize, tree_center: f64, tree_radius: f64) -> usize {
+    let anchor = point_to_box_coordinates(point, level, tree_center, tree_radius);
+    encode_anchor(&anchor)
+}
 
