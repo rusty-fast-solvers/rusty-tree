@@ -1,0 +1,28 @@
+[package]
+name = "rusty-tree"
+version = "0.1.0"
+authors = ["Timo Betcke <timo.betcke@gmail.com>"]
+edition = "2018"
+description = "Octree data structures in Rust."
+license = "BSD-3-Clause"
+homepage = "https://github.com/rusty-fast-solvers/rusty-tree"
+repository = "https://github.com/rusty-fast-solvers/rusty-tree"
+readme = "README.md"
+keywords = ["numerics"]
+categories = ["mathematics", "science"]
+
+[lib]
+name = "rusty_tree"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+rusty-kernel-tools = "0.1"
+num = "0.4"
+ndarray = "0.15"
+
+
+
+[dev-dependencies]
+criterion = { version = "0.3", features = ["html_reports"] }
+
+
