@@ -18,7 +18,7 @@ crate-type = ["lib", "cdylib"]
 [dependencies]
 rusty-kernel-tools = "0.1"
 num = "0.4"
-ndarray = "0.15"
+ndarray = { version = "0.15", features = ["rayon"] }
 
 
 

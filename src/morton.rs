@@ -1,6 +1,6 @@
 //! Routines for Morton encoding and decoding.
 
-use ndarray::{Array1, ArrayView1, Zip};
+use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis, Zip};
 use rusty_kernel_tools::RealType;
 
 const X_LOOKUP_ENCODE: [usize; 256] = [
@@ -261,3 +261,175 @@ pub fn encode_point(point: &[f64; 3], level: usize, tree_center: f64, tree_radiu
     encode_anchor(&anchor)
 }
 
+/// Encode many points.
+///
+/// Return an array containing all Morton keys of a given array of points.
+///
+/// # Arguments
+/// `point` - A (3 ,N) array of N points of type f32 or f64.
+/// `level` - The level of the tree at which the point will be mapped.
+/// `tree_center` - The center of the octree.
+/// `tree_radius` - The radius of the octree.
+
+pub fn encode_points<T: RealType>(
+    points: ArrayView2<T>,
+    level: usize,
+    tree_center: f64,
+    tree_radius: f64,
+) -> Array1<usize> {
+    let npoints = points.len_of(Axis(1));
+    let mut box_coordinates = Array2::<usize>::zeros((3, npoints));
+    let mut keys = Array1::<usize>::zeros(npoints);
+
+    let xmin = num::cast::cast::<f64, T>(tree_center - tree_radius).unwrap();
+    let side_length = 2.0 * tree_radius / ((1 << level) as f64);
+    let side_length = num::cast::cast::<f64, T>(side_length).unwrap();
+
+    Zip::from(points.axis_iter(Axis(0)))
+        .and(box_coordinates.axis_iter_mut(Axis(0)))
+        .for_each(|points_row, box_coordinates_row| {
+            Zip::from(points_row).and(box_coordinates_row).par_for_each(
+                |&point_value, box_coordinate_value| {
+                    let tmp = (point_value - xmin) / side_length;
+                    *box_coordinate_value = num::cast::cast::<T, usize>(tmp.floor()).unwrap();
+                },
+            )
+        });
+
+    Zip::from(keys.view_mut())
+        .and(box_coordinates.axis_iter(Axis(1)))
+        .par_for_each(|key, box_coordinate| {    #[test]
+            fn test_y_encode_table() {
+                for (mut index, actual) in Y_LOOKUP_ENCODE.iter().enumerate() {
+                    let mut sum: usize = 0;
+        
+                    for shift in 0..8 {
+                        sum += (index & 1) << (3 * shift + 1);
+                        index = index >> 1;
+                    }
+        
+                    assert_eq!(sum, *actual);
+                }
+            }
+        
+            let anchor: [usize; 4] = [
+                box_coordinate[0],
+                box_coordinate[1],
+                box_coordinate[2],
+                level,
+            ];
+            *key = encode_anchor(&anchor);
+        });
+
+    keys
+}
+
+/// Helper function for decoding keys.
+fn decode_key_helper(key: usize, lookup_table: &[usize; 512]) -> usize {
+    const N_LOOPS: usize = 7; // 8 bytes in 64 bit key
+    let mut coord: usize = 0;
+
+    for index in 0..N_LOOPS {
+        coord |= lookup_table[(key >> (index * 9)) & NINE_BIT_MASK] << (3 * index);
+    }
+
+    coord
+}
+
+/// Decode a given key.
+///
+/// Returns an array containing the three coordinates and level of the key.
+pub fn decode_key(key: usize) -> [usize; 4] {
+    let level = find_level(key);
+    let key = key >> LEVEL_DISPLACEMENT;
+
+    let x = decode_key_helper(key, &X_LOOKUP_DECODE);
+    let y = decode_key_helper(key, &Y_LOOKUP_DECODE);
+    let z = decode_key_helper(key, &Z_LOOKUP_DECODE);
+
+    [x, y, z, level]
+}
+
+/// Return the key of the parent node.
+pub fn find_parent(key: usize) -> usize {
+    let level = find_level(key);
+    let key = key >> LEVEL_DISPLACEMENT;
+
+    let parent_level = level - 1;
+
+    ((key >> 3) << LEVEL_DISPLACEMENT) | parent_level
+}
+
+/// Return all children of a given key.
+pub fn find_children(key: usize) -> [usize; 8] {
+    let level = find_level(key);
+    let key = key >> LEVEL_DISPLACEMENT;
+
+    let mut children: [usize; 8] = [0; 8];
+
+    let root = (key >> 3) << 3;
+
+    for (index, item) in children.iter_mut().enumerate() {
+        *item = ((root | index) << LEVEL_DISPLACEMENT) | (level + 1);
+    }
+
+    children
+}
+
+/// Return all siblings of a key.
+///
+/// For a given key this function returns all 8 children
+/// of the parent of the key. Hence, the key itself is
+/// returned as well.
+pub fn find_siblings(key: usize) -> [usize; 8] {
+    let parent = find_parent(key);
+    find_children(parent)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_x_encode_table() {
+        for (mut index, actual) in X_LOOKUP_ENCODE.iter().enumerate() {
+            let mut sum: usize = 0;
+
+            for shift in 0..8 {
+                sum += (index & 1) << (3 * shift);
+                index = index >> 1;
+            }
+
+            assert_eq!(sum, *actual);
+        }
+    }
+
+    #[test]
+    fn test_y_encode_table() {
+        for (mut index, actual) in Y_LOOKUP_ENCODE.iter().enumerate() {
+            let mut sum: usize = 0;
+
+            for shift in 0..8 {
+                sum += (index & 1) << (3 * shift + 1);
+                index = index >> 1;
+            }
+
+            assert_eq!(sum, *actual);
+        }
+    }
+
+    #[test]
+    fn test_z_encode_table() {
+        for (mut index, actual) in Z_LOOKUP_ENCODE.iter().enumerate() {
+            let mut sum: usize = 0;
+
+            for shift in 0..8 {
+                sum += (index & 1) << (3 * shift + 2);
+                index = index >> 1;
+            }
+
+            assert_eq!(sum, *actual);
+        }
+    }
+
+}
