@@ -19,6 +19,7 @@ crate-type = ["lib", "cdylib"]
 rusty-kernel-tools = "0.1"
 num = "0.4"
 ndarray = { version = "0.15", features = ["rayon"] }
+rand = "0.8"
 
 
 

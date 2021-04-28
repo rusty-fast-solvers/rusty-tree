@@ -298,20 +298,18 @@ pub fn encode_points<T: RealType>(
 
     Zip::from(keys.view_mut())
         .and(box_coordinates.axis_iter(Axis(1)))
-        .par_for_each(|key, box_coordinate| {    #[test]
+        .par_for_each(|key, box_coordinate| {
+            #[test]
             fn test_y_encode_table() {
                 for (mut index, actual) in Y_LOOKUP_ENCODE.iter().enumerate() {
                     let mut sum: usize = 0;
-        
                     for shift in 0..8 {
                         sum += (index & 1) << (3 * shift + 1);
                         index = index >> 1;
                     }
-        
                     assert_eq!(sum, *actual);
                 }
             }
-        
             let anchor: [usize; 4] = [
                 box_coordinate[0],
                 box_coordinate[1],
@@ -390,13 +388,14 @@ pub fn find_siblings(key: usize) -> [usize; 8] {
 mod tests {
     use super::*;
 
+    /// Test the encoding table for the x-coordinate.
     #[test]
     fn test_x_encode_table() {
         for (mut index, actual) in X_LOOKUP_ENCODE.iter().enumerate() {
             let mut sum: usize = 0;
 
             for shift in 0..8 {
-                sum += (index & 1) << (3 * shift);
+                sum |= (index & 1) << (3 * shift);
                 index = index >> 1;
             }
 
@@ -404,13 +403,14 @@ mod tests {
         }
     }
 
+    /// Test the encoding table for the y-coordinate.
     #[test]
     fn test_y_encode_table() {
         for (mut index, actual) in Y_LOOKUP_ENCODE.iter().enumerate() {
             let mut sum: usize = 0;
 
             for shift in 0..8 {
-                sum += (index & 1) << (3 * shift + 1);
+                sum |= (index & 1) << (3 * shift + 1);
                 index = index >> 1;
             }
 
@@ -418,13 +418,14 @@ mod tests {
         }
     }
 
+    /// Test the encoding table for the z-coordinate.
     #[test]
     fn test_z_encode_table() {
         for (mut index, actual) in Z_LOOKUP_ENCODE.iter().enumerate() {
             let mut sum: usize = 0;
 
             for shift in 0..8 {
-                sum += (index & 1) << (3 * shift + 2);
+                sum |= (index & 1) << (3 * shift + 2);
                 index = index >> 1;
             }
 
@@ -432,4 +433,65 @@ mod tests {
         }
     }
 
+    /// Test the decoding table for the x-coordinate.
+    #[test]
+    fn test_x_decode_table() {
+        let mut expected: usize = 0;
+        for (index, &actual) in X_LOOKUP_DECODE.iter().enumerate() {
+            expected = index & 1;
+            expected |= ((index >> 3) & 1) << 1;
+            expected |= ((index >> 6) & 1) << 2;
+
+            assert_eq!(actual, expected);
+        }
+    }
+
+    /// Test the decoding table for the y-coordinate.
+    #[test]
+    fn test_y_decode_table() {
+        let mut expected: usize = 0;
+        for (index, &actual) in Y_LOOKUP_DECODE.iter().enumerate() {
+            expected = (index >> 1) & 1;
+            expected |= ((index >> 4) & 1) << 1;
+            expected |= ((index >> 7) & 1) << 2;
+
+            assert_eq!(actual, expected);
+        }
+    }
+
+    /// Test the decoding table for the z-coordinate.
+    #[test]
+    fn test_z_decode_table() {
+        let mut expected: usize = 0;
+        for (index, &actual) in Z_LOOKUP_DECODE.iter().enumerate() {
+            expected = (index >> 2) & 1;
+            expected |= ((index >> 5) & 1) << 1;
+            expected |= ((index >> 8) & 1) << 2;
+
+            assert_eq!(actual, expected);
+        }
+    }
+
+    /// Test encoding and decoding an anchor
+    #[test]
+    fn test_encoding_decodiing() {
+        let anchor: [usize; 4] = [65535, 65535, 65535, 16];
+
+        let actual = decode_key(encode_anchor(&anchor));
+
+        assert_eq!(anchor, actual);
+    }
+
+    // /// Test encoding many points
+    // #[test]
+    // fn test_encode_many_points() {
+
+    //     const NPOINTS: usize = 100;
+
+    //     let points =  Array2::<f64>::zeros((3, NPOINTS));
+
+
+
+
+    // }
 }
