@@ -207,18 +207,20 @@ pub fn find_level(key: usize) -> usize {
 pub fn point_to_box_coordinates(
     point: &[f64; 3],
     level: usize,
-    tree_center: f64,
+    tree_center: &[f64; 3],
     tree_radius: f64,
 ) -> [usize; 4] {
+    use itertools::izip;
     let mut anchor: [usize; 4] = [0, 0, 0, 0];
     anchor[3] = level;
 
-    let xmin = tree_center - tree_radius;
     let side_length = 2.0 * tree_radius / ((1 << level) as f64);
 
-    for (anchor_value, &point_value) in anchor.iter_mut().zip(point.iter()) {
-        *anchor_value = ((point_value - xmin) / side_length).floor() as usize;
+    for (anchor_value, point_value, tree_center_value) in izip!(&mut anchor, point, tree_center) {
+        *anchor_value =
+            ((point_value - (tree_center_value - tree_radius)) / side_length).floor() as usize;
     }
+
     anchor
 }
 
@@ -256,9 +258,28 @@ pub fn encode_anchor(anchor: &[usize; 4]) -> usize {
 /// `level` - The level of the tree at which the point will be mapped.
 /// `tree_center` - The center of the octree.
 /// `tree_radius` - The radius of the octree.
-pub fn encode_point(point: &[f64; 3], level: usize, tree_center: f64, tree_radius: f64) -> usize {
-    let anchor = point_to_box_coordinates(point, level, tree_center, tree_radius);
+pub fn encode_point(
+    point: &[f64; 3],
+    level: usize,
+    tree_center: &[f64; 3],
+    tree_radius: f64,
+) -> usize {
+    let anchor = point_to_box_coordinates(point, level, &tree_center, tree_radius);
     encode_anchor(&anchor)
+}
+
+pub fn anchor_to_coord(anchor: &[usize; 4], tree_center: &[f64; 3], tree_radius: f64) -> [f64; 3] {
+    use itertools::izip;
+    let mut coord: [f64; 3] = [0.0; 3];
+
+    let level = anchor[3];
+    let side_length = 2.0 * tree_radius / ((1 << level) as f64);
+
+    for (&center, &anchor_value, min_ref) in izip!(tree_center, anchor, &mut coord) {
+        *min_ref = (center - tree_radius) + side_length * (anchor_value as f64);
+    }
+
+    coord
 }
 
 /// Encode many points.
@@ -274,23 +295,29 @@ pub fn encode_point(point: &[f64; 3], level: usize, tree_center: f64, tree_radiu
 pub fn encode_points<T: RealType>(
     points: ArrayView2<T>,
     level: usize,
-    tree_center: f64,
+    tree_center: &[f64; 3],
     tree_radius: f64,
 ) -> Array1<usize> {
     let npoints = points.len_of(Axis(1));
     let mut box_coordinates = Array2::<usize>::zeros((3, npoints));
     let mut keys = Array1::<usize>::zeros(npoints);
 
-    let xmin = num::cast::cast::<f64, T>(tree_center - tree_radius).unwrap();
     let side_length = 2.0 * tree_radius / ((1 << level) as f64);
     let side_length = num::cast::cast::<f64, T>(side_length).unwrap();
 
+    let mut min_bound = Array1::<T>::zeros(3);
+
+    for (index, min_ref) in min_bound.iter_mut().enumerate() {
+        *min_ref = num::cast::cast::<f64, T>(tree_center[index] - tree_radius).unwrap();
+    }
+
     Zip::from(points.axis_iter(Axis(0)))
         .and(box_coordinates.axis_iter_mut(Axis(0)))
-        .for_each(|points_row, box_coordinates_row| {
+        .and(min_bound.view())
+        .for_each(|points_row, box_coordinates_row, &min_value| {
             Zip::from(points_row).and(box_coordinates_row).par_for_each(
                 |&point_value, box_coordinate_value| {
-                    let tmp = (point_value - xmin) / side_length;
+                    let tmp = (point_value - min_value) / side_length;
                     *box_coordinate_value = num::cast::cast::<T, usize>(tmp.floor()).unwrap();
                 },
             )
@@ -472,26 +499,47 @@ mod tests {
         }
     }
 
-    /// Test encoding and decoding an anchor
-    #[test]
-    fn test_encoding_decodiing() {
-        let anchor: [usize; 4] = [65535, 65535, 65535, 16];
+    // /// Test encoding and decoding an anchor
+    // #[test]
+    // fn test_encoding_decodiing() {
+    //     let anchor: [usize; 4] = [65535, 65535, 65535, 16];
 
-        let actual = decode_key(encode_anchor(&anchor));
+    //     let actual = decode_key(encode_anchor(&anchor));
 
-        assert_eq!(anchor, actual);
-    }
+    //     assert_eq!(anchor, actual);
+    // }
 
     // /// Test encoding many points
     // #[test]
     // fn test_encode_many_points() {
+    //     use rand::prelude::*;
 
     //     const NPOINTS: usize = 100;
+    //     const LEVEL: usize = 4;
 
-    //     let points =  Array2::<f64>::zeros((3, NPOINTS));
+    //     let mut rng = rand::thread_rng();
 
+    //     let mut points = Array2::<f64>::zeros((3, NPOINTS));
 
+    //     points.iter_mut().for_each(|item| *item = rng.gen::<f64>());
 
+    //     let tree_center = [0.65, 0.5, 0.4]; // Don't just choose the mid-point of the unit interval as centre
 
+    //     let tree_radius = 0.62;
+
+    //     // First check that the encoding function for a single point gives the same results as
+    //     // the encoding function for all points.
+
+    //     let keys = encode_points(points.view(), LEVEL, &tree_center, tree_radius);
+    //     let mut keys_via_single_points = Array1::<usize>::zeros(NPOINTS);
+
+    //     for (point, key) in points.axis_iter(Axis(1)).zip(keys_via_single_points.iter()) {
+    //         let point_arr = [point[0], point[1], point[2]];
+    //         let single_key = encode_point(&point_arr, LEVEL, &tree_center, tree_radius);
+
+    //         // Check if box is close to the point.
+
+    //         let coords = decode_key(single_key);
+    //     }
     // }
 }
