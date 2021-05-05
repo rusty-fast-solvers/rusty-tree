@@ -2,6 +2,7 @@
 
 use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis, Zip};
 use rusty_kernel_tools::RealType;
+use std::collections::{HashMap, HashSet};
 
 const X_LOOKUP_ENCODE: [usize; 256] = [
     0x00000000, 0x00000001, 0x00000008, 0x00000009, 0x00000040, 0x00000041, 0x00000048, 0x00000049,
@@ -303,7 +304,6 @@ pub fn anchor_to_coordinates(
 /// `level` - The level of the tree at which the point will be mapped.
 /// `tree_center` - The center of the octree.
 /// `tree_radius` - The radius of the octree.
-
 pub fn encode_points<T: RealType>(
     points: ArrayView2<T>,
     level: usize,
@@ -423,8 +423,21 @@ pub fn find_siblings(key: usize) -> [usize; 8] {
     find_children(parent)
 }
 
-/// Find neighbor key in a given direction.
-pub fn find_neighbour(anchor: &[usize; 4], direction: &[i64; 3]) -> Option<usize> {
+/// Find key in a given direction.
+///
+/// Returns the key obtained by moving direction[j] boxes into direction j
+/// starting from the anchor associated with the given key.
+/// Negative steps are possible. If the result is out of bounds,
+/// i.e.. anchor[j] + direction[j is negative or larger than the number of boxes
+/// across each dimension, `None` is returned. Otherwise, `Some(new_key)` is returned,
+/// where `new_key` is the Morton key after moving into the given direction.
+///
+/// # Arguments
+/// `key` - The starting key.
+/// `direction` - A vector describing how many boxes we move along each coordinate direction.
+///               Negative values are possible (meaning that we move backwards).
+pub fn find_key_in_direction(key: usize, direction: &[i64; 3]) -> Option<usize> {
+    let anchor = decode_key(key);
 
     let level = anchor[3];
 
@@ -438,14 +451,58 @@ pub fn find_neighbour(anchor: &[usize; 4], direction: &[i64; 3]) -> Option<usize
     let y = y + direction[1];
     let z = z + direction[2];
 
-    if (x >= 0) & (y >= 0) & (z >= 0) & (x < max_number_of_boxes) & (y < max_number_of_boxes) & (z < max_number_of_boxes) {
+    if (x >= 0)
+        & (y >= 0)
+        & (z >= 0)
+        & (x < max_number_of_boxes)
+        & (y < max_number_of_boxes)
+        & (z < max_number_of_boxes)
+    {
         let new_anchor: [usize; 4] = [x as usize, y as usize, z as usize, level];
         Some(encode_anchor(&new_anchor))
-    }  
-    else {
+    } else {
         None
     }
+}
 
+/// Compute nearfield
+///
+/// The nearfield is the set of all boxes that are bordering the current box, including the box itself.
+///
+/// # Arguments
+/// `key` - The key for which we want to compute the neighbours.
+pub fn compute_nearfield(key: usize) -> HashSet<usize> {
+    let mut near_field = HashSet::<usize>::new();
+
+    use itertools::iproduct;
+
+    for (i, j, k) in iproduct!(0..3, 0..3, 0..3) {
+        let direction: [i64; 3] = [i - 1, j - 1, k - 1];
+        if let Some(key) = find_key_in_direction(key, &direction) {
+            near_field.insert(key);
+        }
+    }
+    near_field
+}
+
+/// Compute interaction list
+pub fn compute_interaction_list(key: usize) -> HashMap<(i8, i8, i8), usize> {
+
+    let mut interaction_list = HashMap::<(i8, i8, i8), usize>::new();
+    let near_field = compute_nearfield(key);
+
+    let parent = find_parent(key);
+    let parent_near_field = compute_nearfield(parent);
+
+    for &parent_neighbour in parent_near_field.iter() {
+
+        let children = find_children(parent_neighbour);
+
+
+
+    }
+
+    interaction_list
 
 }
 
@@ -582,7 +639,6 @@ mod tests {
                 assert!(coords[dim] <= point_arr[dim]);
                 assert!(point_arr[dim] < coords[dim] + box_size);
             }
-
         }
     }
 }
