@@ -1,8 +1,8 @@
 //! Routines for Morton encoding and decoding.
 
-use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis, Zip};
+use ndarray::{Array1, Array2, ArrayView2, Axis, Zip};
 use rusty_kernel_tools::RealType;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashSet};
 
 const X_LOOKUP_ENCODE: [usize; 256] = [
     0x00000000, 0x00000001, 0x00000008, 0x00000009, 0x00000040, 0x00000041, 0x00000048, 0x00000049,
@@ -176,20 +176,8 @@ const LEVEL_MASK: usize = 0x7FFF;
 const BYTE_MASK: usize = 0xFF;
 const BYTE_DISPLACEMENT: usize = 8;
 
-// Mask for lowest order index bits
-const LOWEST_ORDER_MASK: usize = 0x7;
-
 // Mask encapsulating a bit
 const NINE_BIT_MASK: usize = 0x1FF;
-
-// Masks for coordinate bits along specific axes in a int64 Morton Key
-const X_MASK: usize = 0b001001001001001001001001001001001001001001001001;
-const Y_MASK: usize = 0b010010010010010010010010010010010010010010010010;
-const Z_MASK: usize = 0b100100100100100100100100100100100100100100100100;
-
-const YZ_MASK: usize = 0b110110110110110110110110110110110110110110110110;
-const XZ_MASK: usize = 0b101101101101101101101101101101101101101101101101;
-const XY_MASK: usize = 0b011011011011011011011011011011011011011011011011;
 
 /// Return the level associated with a key.
 pub fn find_level(key: usize) -> usize {
@@ -486,9 +474,14 @@ pub fn compute_nearfield(key: usize) -> HashSet<usize> {
 }
 
 /// Compute interaction list
-pub fn compute_interaction_list(key: usize) -> HashMap<(i8, i8, i8), usize> {
+/// 
+/// The interaction list of a key consists of all the children of the near field of the
+/// parent that are not themselves in the near field of the key.
+/// The function returns a set of all keys that form the interaction list of the
+/// current key.
+pub fn compute_interaction_list(key: usize) -> HashSet<usize> {
 
-    let mut interaction_list = HashMap::<(i8, i8, i8), usize>::new();
+    let mut interaction_list = HashSet::<usize>::new();
     let near_field = compute_nearfield(key);
 
     let parent = find_parent(key);
@@ -497,8 +490,11 @@ pub fn compute_interaction_list(key: usize) -> HashMap<(i8, i8, i8), usize> {
     for &parent_neighbour in parent_near_field.iter() {
 
         let children = find_children(parent_neighbour);
-
-
+        for &child in children.iter() {
+            if !near_field.contains(&child) {
+                interaction_list.insert(child);
+            }
+        }
 
     }
 
