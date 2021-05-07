@@ -166,17 +166,17 @@ const Z_LOOKUP_DECODE: [usize; 512] = [
     6, 6, 6, 6, 7, 7, 7, 7, 6, 6, 6, 6, 7, 7, 7, 7, 6, 6, 6, 6, 7, 7, 7, 7, 6, 6, 6, 6, 7, 7, 7, 7,
 ];
 
-// Number of bits used for Level information
+// Number of bits used for Level information.
 const LEVEL_DISPLACEMENT: usize = 15;
 
-// Mask for the last 15 bits
+// Mask for the last 15 bits.
 const LEVEL_MASK: usize = 0x7FFF;
 
-// Mask for lowest order byte
+// Mask for lowest order byte.
 const BYTE_MASK: usize = 0xFF;
 const BYTE_DISPLACEMENT: usize = 8;
 
-// Mask encapsulating a bit
+// Mask encapsulating a bit.
 const NINE_BIT_MASK: usize = 0x1FF;
 
 /// Return the level associated with a key.
@@ -398,10 +398,10 @@ pub fn find_siblings(key: usize) -> [usize; 8] {
 
 /// Find key in a given direction.
 ///
-/// Returns the key obtained by moving direction[j] boxes into direction j
+/// Returns the key obtained by moving direction\[j\] boxes into direction j
 /// starting from the anchor associated with the given key.
 /// Negative steps are possible. If the result is out of bounds,
-/// i.e.. anchor[j] + direction[j is negative or larger than the number of boxes
+/// i.e. anchor\[j\] + direction\[j\] is negative or larger than the number of boxes
 /// across each dimension, `None` is returned. Otherwise, `Some(new_key)` is returned,
 /// where `new_key` is the Morton key after moving into the given direction.
 ///
@@ -438,7 +438,7 @@ pub fn find_key_in_direction(key: usize, direction: &[i64; 3]) -> Option<usize> 
     }
 }
 
-/// Compute near field
+/// Compute near field.
 ///
 /// The near field is the set of all boxes that are bordering the current box, including the box itself.
 ///
@@ -458,7 +458,7 @@ pub fn compute_near_field(key: usize) -> HashSet<usize> {
     near_field
 }
 
-/// Compute interaction list
+/// Compute interaction list.
 /// 
 /// The interaction list of a key consists of all the children of the near field of the
 /// parent that are not themselves in the near field of the key.
@@ -467,6 +467,13 @@ pub fn compute_near_field(key: usize) -> HashSet<usize> {
 pub fn compute_interaction_list(key: usize) -> HashSet<usize> {
 
     let mut interaction_list = HashSet::<usize>::new();
+    let level = find_level(key);
+
+    if level < 2 {
+        // Levels zero and one always have empty interaction lists.
+        return interaction_list;
+    }
+
     let near_field = compute_near_field(key);
 
     let parent = find_parent(key);
