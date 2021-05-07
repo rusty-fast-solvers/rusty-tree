@@ -1,6 +1,6 @@
 //! Routines for Morton encoding and decoding.
 
-use ndarray::{Array1, Array2, ArrayView2, Axis, Zip};
+use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis, Zip};
 use rusty_kernel_tools::RealType;
 use std::collections::{HashSet};
 
@@ -191,23 +191,22 @@ pub fn find_level(key: usize) -> usize {
 /// # Arguments
 /// `point` - The (x, y, z) coordinates of the point to map.
 /// `level` - The level of the tree at which the point will be mapped.
-/// `tree_center` - The center of the octree.
-/// `tree_radius` - The radius of the octree.
-pub fn point_to_box_coordinates(
+/// `origin` - The origin of the bounding box.
+/// `diameter` - The diameter of the bounding box in each dimension.
+pub fn point_to_anchor(
     point: &[f64; 3],
     level: usize,
-    tree_center: &[f64; 3],
-    tree_radius: f64,
+    origin: &[f64; 3],
+    diameter: &[f64; 3],
 ) -> [usize; 4] {
     use itertools::izip;
     let mut anchor: [usize; 4] = [0, 0, 0, 0];
     anchor[3] = level;
 
-    let side_length = 2.0 * tree_radius / ((1 << level) as f64);
+    let level_size = (1 << level) as f64;
 
-    for (anchor_value, point_value, tree_center_value) in izip!(&mut anchor, point, tree_center) {
-        *anchor_value =
-            ((point_value - (tree_center_value - tree_radius)) / side_length).floor() as usize;
+    for (anchor_value, point_value, &origin_value, &diameter_value) in izip!(&mut anchor, point, origin, diameter) {
+        *anchor_value = ((point_value - origin_value) * level_size / diameter_value).floor() as usize
     }
 
     anchor
@@ -245,15 +244,15 @@ pub fn encode_anchor(anchor: &[usize; 4]) -> usize {
 /// # Arguments
 /// `point` - The (x, y, z) coordinates of the point to map.
 /// `level` - The level of the tree at which the point will be mapped.
-/// `tree_center` - The center of the octree.
-/// `tree_radius` - The radius of the octree.
+/// `origin` - The origin of the bounding box.
+/// `diameter` - The diameter of the bounding box in each dimension.
 pub fn encode_point(
     point: &[f64; 3],
     level: usize,
-    tree_center: &[f64; 3],
-    tree_radius: f64,
+    origin: &[f64; 3],
+    diameter: &[f64; 3],
 ) -> usize {
-    let anchor = point_to_box_coordinates(point, level, &tree_center, tree_radius);
+    let anchor = point_to_anchor(point, level, origin, diameter);
     encode_anchor(&anchor)
 }
 
@@ -263,21 +262,21 @@ pub fn encode_point(
 ///
 /// # Arguments
 /// `anchor` - The three indices describing the box and the level information.
-/// `tree_center - The center of the tree.
-/// `tree_radius` - The tree radius.
+/// `origin` - The origin of the bounding box.
+/// `diameter` - The diameter of the bounding box in each dimension.
 pub fn anchor_to_coordinates(
     anchor: &[usize; 4],
-    tree_center: &[f64; 3],
-    tree_radius: f64,
+    origin: &[f64; 3],
+    diameter: &[f64; 3],
 ) -> [f64; 3] {
     use itertools::izip;
     let mut coord: [f64; 3] = [0.0; 3];
 
     let level = anchor[3];
-    let side_length = 2.0 * tree_radius / ((1 << level) as f64);
+    let level_size = (1 << level) as f64;
 
-    for (&center, &anchor_value, coord_ref) in izip!(tree_center, anchor, &mut coord) {
-        *coord_ref = (center - tree_radius) + side_length * (anchor_value as f64);
+    for (&anchor_value, coord_ref, &origin_value, &diameter_value) in izip!(anchor, &mut coord, origin, diameter) {
+        *coord_ref = origin_value + diameter_value * (anchor_value as f64) / level_size;
     }
 
     coord
@@ -290,35 +289,32 @@ pub fn anchor_to_coordinates(
 /// # Arguments
 /// `point` - A (3 ,N) array of N points of type f32 or f64.
 /// `level` - The level of the tree at which the point will be mapped.
-/// `tree_center` - The center of the octree.
-/// `tree_radius` - The radius of the octree.
+/// `origin` - The origin of the bounding box.
+/// `diameter` - The diameter of the bounding box in each dimension.
 pub fn encode_points<T: RealType>(
     points: ArrayView2<T>,
     level: usize,
-    tree_center: &[f64; 3],
-    tree_radius: f64,
+    origin: &[f64; 3],
+    diameter: &[f64; 3],
 ) -> Array1<usize> {
     let npoints = points.len_of(Axis(1));
     let mut box_coordinates = Array2::<usize>::zeros((3, npoints));
     let mut keys = Array1::<usize>::zeros(npoints);
 
-    let side_length = 2.0 * tree_radius / ((1 << level) as f64);
-    let side_length = num::cast::cast::<f64, T>(side_length).unwrap();
+    let level_size = (1 << level) as f64;
 
-    let mut min_bound = Array1::<T>::zeros(3);
-
-    for (index, min_ref) in min_bound.iter_mut().enumerate() {
-        *min_ref = num::cast::cast::<f64, T>(tree_center[index] - tree_radius).unwrap();
-    }
+    let origin_view = ArrayView1::from(origin);
+    let diameter_view = ArrayView1::from(diameter);
 
     Zip::from(points.axis_iter(Axis(0)))
         .and(box_coordinates.axis_iter_mut(Axis(0)))
-        .and(min_bound.view())
-        .for_each(|points_row, box_coordinates_row, &min_value| {
+        .and(origin_view)
+        .and(diameter_view)
+        .for_each(|points_row, box_coordinates_row, &origin_value, &diameter_value| {
             Zip::from(points_row).and(box_coordinates_row).par_for_each(
                 |&point_value, box_coordinate_value| {
-                    let tmp = (point_value - min_value) / side_length;
-                    *box_coordinate_value = tmp.floor().to_usize().unwrap();
+                    let tmp = (point_value.to_f64().unwrap() - origin_value) * level_size / diameter_value;
+                    *box_coordinate_value = tmp.floor() as usize;
                 },
             )
         });
@@ -326,17 +322,6 @@ pub fn encode_points<T: RealType>(
     Zip::from(keys.view_mut())
         .and(box_coordinates.axis_iter(Axis(1)))
         .par_for_each(|key, box_coordinate| {
-            #[test]
-            fn test_y_encode_table() {
-                for (mut index, actual) in Y_LOOKUP_ENCODE.iter().enumerate() {
-                    let mut sum: usize = 0;
-                    for shift in 0..8 {
-                        sum += (index & 1) << (3 * shift + 1);
-                        index = index >> 1;
-                    }
-                    assert_eq!(sum, *actual);
-                }
-            }
             let anchor: [usize; 4] = [
                 box_coordinate[0],
                 box_coordinate[1],
@@ -453,13 +438,13 @@ pub fn find_key_in_direction(key: usize, direction: &[i64; 3]) -> Option<usize> 
     }
 }
 
-/// Compute nearfield
+/// Compute near field
 ///
-/// The nearfield is the set of all boxes that are bordering the current box, including the box itself.
+/// The near field is the set of all boxes that are bordering the current box, including the box itself.
 ///
 /// # Arguments
 /// `key` - The key for which we want to compute the neighbours.
-pub fn compute_nearfield(key: usize) -> HashSet<usize> {
+pub fn compute_near_field(key: usize) -> HashSet<usize> {
     let mut near_field = HashSet::<usize>::new();
 
     use itertools::iproduct;
@@ -482,10 +467,10 @@ pub fn compute_nearfield(key: usize) -> HashSet<usize> {
 pub fn compute_interaction_list(key: usize) -> HashSet<usize> {
 
     let mut interaction_list = HashSet::<usize>::new();
-    let near_field = compute_nearfield(key);
+    let near_field = compute_near_field(key);
 
     let parent = find_parent(key);
-    let parent_near_field = compute_nearfield(parent);
+    let parent_near_field = compute_near_field(parent);
 
     for &parent_neighbour in parent_near_field.iter() {
 
@@ -578,9 +563,8 @@ mod tests {
     /// Test the decoding table for the z-coordinate.
     #[test]
     fn test_z_decode_table() {
-        let mut expected: usize = 0;
         for (index, &actual) in Z_LOOKUP_DECODE.iter().enumerate() {
-            expected = (index >> 2) & 1;
+            let mut expected: usize  = (index >> 2) & 1;
             expected |= ((index >> 5) & 1) << 1;
             expected |= ((index >> 8) & 1) << 2;
 
@@ -612,14 +596,15 @@ mod tests {
 
         points.iter_mut().for_each(|item| *item = rng.gen::<f64>());
 
-        let tree_center = [0.65, 0.5, 0.4]; // Don't just choose the mid-point of the unit interval as centre
+        let origin = [-0.1, -0.2, 0.0];
+        let diameter = [1.2, 1.3, 1.01];
+        let keys = encode_points(points.view(), LEVEL, &origin, &diameter);
 
-        let tree_radius = 0.65;
-        let keys = encode_points(points.view(), LEVEL, &tree_center, tree_radius);
+        let level_size = (1 << LEVEL) as f64;
 
         for (point, &key) in points.axis_iter(Axis(1)).zip(keys.iter()) {
             let point_arr = [point[0], point[1], point[2]];
-            let single_key = encode_point(&point_arr, LEVEL, &tree_center, tree_radius);
+            let single_key = encode_point(&point_arr, LEVEL, &origin, &diameter);
 
             // Check that the key via encode_point is the same as the key via encode_points
 
@@ -627,13 +612,13 @@ mod tests {
 
             // Check if box is close to the point.
 
-            let box_size = 2.0 * tree_radius / ((1 << LEVEL) as f64);
+            let box_diameter = [diameter[0] / level_size, diameter[1] / level_size, diameter[2] / level_size];
 
             let anchor = decode_key(single_key);
-            let coords = anchor_to_coordinates(&anchor, &tree_center, tree_radius);
+            let coords = anchor_to_coordinates(&anchor, &origin, &diameter);
             for dim in 0..3 {
                 assert!(coords[dim] <= point_arr[dim]);
-                assert!(point_arr[dim] < coords[dim] + box_size);
+                assert!(point_arr[dim] < coords[dim] + box_diameter[dim]);
             }
         }
     }
