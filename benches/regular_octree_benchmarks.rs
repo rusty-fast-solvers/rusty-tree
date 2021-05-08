@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rusty_tree::morton::*;
-use rusty_tree::regular_octree::*;
+use rusty_tree::octree::*;
 use rand::Rng;
 
 

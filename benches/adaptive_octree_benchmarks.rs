@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use rusty_tree::adaptive_octree::*;
+use rusty_tree::octree::*;
 use rand::Rng;
 
 

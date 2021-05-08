@@ -5,47 +5,13 @@
 //! dealing with many empty boxes only the non-empty leaf boxes
 //! are actually being stored.
 
-use super::helpers::TreeStatistics;
-use ndarray::{Array1, ArrayView2, Axis};
+use super::{Statistics, Octree};
+use ndarray::{ArrayView2, Axis};
 use rayon::prelude::*;
 use rusty_kernel_tools::RealType;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
-pub struct RegularOctree<'a, T: RealType> {
-    /// A (3, N) array of N particles.
-    pub particles: ArrayView2<'a, T>,
-
-    /// The maximum level in the tree.
-    pub max_level: usize,
-
-    /// The origin of the bounding box for the particles.
-    pub origin: [f64; 3],
-
-    /// The diameter across each dimension of the bounding box.
-    pub diameter: [f64; 3],
-
-    /// The non-empty keys for each level of the tree.
-    pub level_keys: HashMap<usize, HashSet<usize>>,
-
-    /// The keys associated with the particles.
-    pub particle_to_keys: Array1<usize>,
-
-    /// The set of near-field keys for each non-empty key.
-    pub near_field: HashMap<usize, HashSet<usize>>,
-
-    /// The set of keys in the interaction list for each non-empty key.
-    pub interaction_list: HashMap<usize, HashSet<usize>>,
-
-    /// The index set of particles associated with each leaf key.
-    pub leaf_key_to_particles: HashMap<usize, HashSet<usize>>,
-
-    /// The set of all non-empty keys in the tree.
-    pub all_keys: HashSet<usize>,
-
-    /// Statistics for the tree.
-    pub statistics: TreeStatistics,
-}
 
 /// Create a regular Octree.
 ///
@@ -57,8 +23,8 @@ pub struct RegularOctree<'a, T: RealType> {
 pub fn regular_octree<T: RealType>(
     particles: ArrayView2<T>,
     max_level: usize,
-) -> RegularOctree<'_, T> {
-    use super::helpers::compute_bounds;
+) -> Octree<'_, T> {
+    use crate::helpers::compute_bounds;
 
     const TOL: f64 = 1E-5;
 
@@ -92,8 +58,8 @@ pub fn regular_octree_with_bounding_box<T: RealType>(
     max_level: usize,
     origin: [f64; 3],
     diameter: [f64; 3],
-) -> RegularOctree<'_, T> {
-    use super::morton::{compute_interaction_list, compute_near_field, encode_points, find_parent};
+) -> Octree<'_, T> {
+    use crate::morton::{compute_interaction_list, compute_near_field, encode_points, find_parent};
     use std::iter::FromIterator;
 
     let now = Instant::now();
@@ -152,7 +118,7 @@ pub fn regular_octree_with_bounding_box<T: RealType>(
 
     let duration = now.elapsed();
 
-    let statistics = TreeStatistics {
+    let statistics = Statistics {
         number_of_particles: particles.len_of(Axis(1)),
         max_level: max_level,
         number_of_leafs: leaf_key_to_particles.keys().len(),
@@ -175,13 +141,13 @@ pub fn regular_octree_with_bounding_box<T: RealType>(
             / (leaf_key_to_particles.keys().len() as f64),
     };
 
-    RegularOctree {
+    Octree {
         particles: particles,
         max_level: max_level,
         origin: origin,
         diameter: diameter,
         level_keys: level_keys,
-        particle_to_keys: leaf_keys,
+        particle_keys: leaf_keys,
         near_field: near_field,
         interaction_list: interaction_list,
         leaf_key_to_particles: leaf_key_to_particles,
