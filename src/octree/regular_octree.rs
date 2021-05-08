@@ -5,7 +5,7 @@
 //! dealing with many empty boxes only the non-empty leaf boxes
 //! are actually being stored.
 
-use super::{Statistics, Octree};
+use super::{Statistics, Octree, OctreeType};
 use ndarray::{ArrayView2, Axis};
 use rayon::prelude::*;
 use rusty_kernel_tools::RealType;
@@ -152,6 +152,7 @@ pub fn regular_octree_with_bounding_box<T: RealType>(
         interaction_list: interaction_list,
         leaf_key_to_particles: leaf_key_to_particles,
         all_keys: all_keys,
+        octree_type: OctreeType::Regular,
         statistics: statistics,
     }
 }

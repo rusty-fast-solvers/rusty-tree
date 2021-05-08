@@ -1,16 +1,26 @@
 //! Data structures and functions to create regular and adaptive Octrees.
 
-use rusty_kernel_tools::RealType;
 use ndarray::{Array1, ArrayView2};
+use rusty_kernel_tools::RealType;
 use std::collections::{HashMap, HashSet};
-use std::time::Duration;
 use std::fmt;
+use std::time::Duration;
 
-pub mod regular_octree;
 pub mod adaptive_octree;
+pub mod regular_octree;
 
-pub use regular_octree::*;
 pub use adaptive_octree::*;
+pub use regular_octree::*;
+
+/// The type of the octree.
+pub enum OctreeType {
+    /// Regular octree.
+    Regular,
+    /// Use for balanced adaptive octrees.
+    BalancedAdaptive,
+    /// Use for unbalanced adaptive octrees.
+    UnbalancedAdaptive,
+}
 
 /// The basic Octree data structure
 pub struct Octree<'a, T: RealType> {
@@ -43,6 +53,9 @@ pub struct Octree<'a, T: RealType> {
 
     /// The set of all non-empty keys in the tree.
     pub all_keys: HashSet<usize>,
+
+    /// The type of the Octree.
+    pub octree_type: OctreeType,
 
     /// Statistics for the tree.
     pub statistics: Statistics,

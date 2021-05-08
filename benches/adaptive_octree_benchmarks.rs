@@ -14,7 +14,7 @@ fn benchmark_make_adaptive_octree(c: &mut Criterion) {
 
     c.bench_function("create adaptive octree", |b| {
         b.iter(|| {
-            adaptive_octree(particles.view(), black_box(max_particles));
+            adaptive_octree(particles.view(), black_box(max_particles), BalanceMode::Balanced);
         })
     });
 

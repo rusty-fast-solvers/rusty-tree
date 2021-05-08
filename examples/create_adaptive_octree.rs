@@ -6,7 +6,7 @@ use rand::Rng;
 use rusty_tree::octree::*;
 
 const NPARTICLES: usize = 1000000;
-const MAX_LEVEL: usize = 6;
+const MAX_PARTICLES: usize = 200;
 
 pub fn main() {
     // Create random particles on the unit sphere.
@@ -20,7 +20,7 @@ pub fn main() {
         particle.map_inplace(|item| *item = *item / norm);
     }
 
-    let tree = regular_octree(particles.view(), MAX_LEVEL);
+    let balanced_tree = adaptive_octree(particles.view(), MAX_PARTICLES, BalanceMode::Balanced);
 
-    println!("{}", tree.statistics);
+    println!("{}", balanced_tree.statistics);
 }
