@@ -25,6 +25,12 @@ fn refine_tree<T: RealType>(
     use crate::morton::{encode_point, find_level};
 
     let level = find_level(key);
+
+    if (level == 16) | (refine_indices.len() < max_particles) {
+        // Do not refine if we have reached level cap or
+        // we are already below the particle limit.
+        return;
+    }
     let mut new_keys = HashSet::<usize>::new();
 
     for &particle_index in refine_indices {
@@ -45,17 +51,15 @@ fn refine_tree<T: RealType>(
             .copied()
             .filter(|&item| particle_keys[item] == new_key)
             .collect();
-        if associated_indices.len() > max_particles {
-            refine_tree(
-                new_key,
-                &associated_indices,
-                particle_keys.view_mut(),
-                particles,
-                max_particles,
-                origin,
-                diameter,
-            );
-        }
+        refine_tree(
+            new_key,
+            &associated_indices,
+            particle_keys.view_mut(),
+            particles,
+            max_particles,
+            origin,
+            diameter,
+        );
     }
 }
 
@@ -92,8 +96,6 @@ pub fn adaptive_octree<T: RealType>(
     adaptive_octree_with_bounding_box(particles, max_particles, origin, diameter, balance_mode)
 }
 
-
-
 /// Create an adaptive Octree with given bounding box.
 ///
 /// Returns a `AdaptiveOctree` struct describing an adaptive octree.
@@ -111,7 +113,10 @@ pub fn adaptive_octree_with_bounding_box<T: RealType>(
     diameter: [f64; 3],
     balance_mode: BalanceMode,
 ) -> Octree<'_, T> {
-    use super::{compute_interaction_list_map, compute_near_field_map, compute_leaf_map, compute_level_information};
+    use super::{
+        compute_interaction_list_map, compute_leaf_map, compute_level_information,
+        compute_near_field_map,
+    };
 
     let number_of_particles = particles.len_of(Axis(1));
 

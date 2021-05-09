@@ -5,8 +5,8 @@ use rand::Rng;
 
 
 fn benchmark_make_adaptive_octree(c: &mut Criterion) {
-    let nparticles = 1000000;
-    let max_particles = 200;
+    let nparticles = 100000;
+    let max_particles = 100;
     let mut rng = rand::thread_rng();
     let mut particles = ndarray::Array2::<f64>::zeros((3, nparticles));
     particles.map_inplace(|item| *item = rng.gen::<f64>());

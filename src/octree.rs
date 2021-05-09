@@ -222,7 +222,7 @@ pub fn compute_level_information(
 
     let mut all_keys = HashSet::<usize>::new();
 
-    for (_, current_keys) in &level_keys {
+    for (_, current_keys) in level_keys.iter() {
         all_keys.extend(current_keys.iter());
     }
 
