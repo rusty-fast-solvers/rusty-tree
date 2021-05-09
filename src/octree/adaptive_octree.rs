@@ -228,10 +228,13 @@ fn balance_tree<T: RealType>(
     origin: &[f64; 3],
     diameter: &[f64; 3],
 ) {
+    use super::compute_complete_regular_tree;
     use crate::morton::{compute_near_field, encode_point, find_level, find_parent};
 
     let max_level = level_keys.keys().max().unwrap().clone();
     let nlevels = 1 + max_level;
+
+    let regular_tree = compute_complete_regular_tree(particles, max_level, origin, diameter);
 
     for level in (1..nlevels).rev() {
         let current_keys: HashSet<usize> =
@@ -240,7 +243,11 @@ fn balance_tree<T: RealType>(
             let near_field = compute_near_field(key);
             for near_field_key in near_field {
                 let parent = find_parent(near_field_key);
-                find_completion(parent, level_keys, all_keys);
+                // Only fill up if there can actually be particles in the parent
+                // of the neighbour.
+                if regular_tree.contains(&parent) {
+                    find_completion(parent, level_keys, all_keys);
+                }
             }
         }
     }

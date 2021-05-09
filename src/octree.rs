@@ -103,13 +103,12 @@ impl std::fmt::Display for Statistics {
 }
 
 /// Given the set of all keys, compute the interaction list for each key.
-/// 
+///
 /// Returns a map from keys to the corresponding interaction list, represented by
 /// a set of keys.
 pub fn compute_interaction_list_map(all_keys: &HashSet<usize>) -> HashMap<usize, HashSet<usize>> {
-
-    use rayon::prelude::*;
     use crate::morton::compute_interaction_list;
+    use rayon::prelude::*;
 
     let mut interaction_list_map = HashMap::<usize, HashSet<usize>>::new();
 
@@ -117,23 +116,23 @@ pub fn compute_interaction_list_map(all_keys: &HashSet<usize>) -> HashMap<usize,
         interaction_list_map.insert(key, HashSet::<usize>::new());
     }
 
-    interaction_list_map.par_iter_mut().for_each(|(&key, hash_set)| {
-        let current_interaction_list = compute_interaction_list(key);
-        hash_set.extend(&current_interaction_list);
-    });
+    interaction_list_map
+        .par_iter_mut()
+        .for_each(|(&key, hash_set)| {
+            let current_interaction_list = compute_interaction_list(key);
+            hash_set.extend(&current_interaction_list);
+        });
 
     interaction_list_map
-
 }
 
 /// Given the set of all keys, compute the near field for each key.
-/// 
+///
 /// Returns a map from keys to the corresponding near field, represented by
 /// a set of keys.
 pub fn compute_near_field_map(all_keys: &HashSet<usize>) -> HashMap<usize, HashSet<usize>> {
-
-    use rayon::prelude::*;
     use crate::morton::compute_near_field;
+    use rayon::prelude::*;
 
     let mut near_field_map = HashMap::<usize, HashSet<usize>>::new();
 
@@ -147,14 +146,12 @@ pub fn compute_near_field_map(all_keys: &HashSet<usize>) -> HashMap<usize, HashS
     });
 
     near_field_map
-
 }
 
 /// Compute the leaf map.
-/// 
+///
 /// Returns a map from leaf keys to associated particle indices.
 pub fn compute_leaf_map(particle_keys: ArrayView1<usize>) -> HashMap<usize, HashSet<usize>> {
-
     use itertools::Itertools;
 
     let mut leaf_key_to_particles = HashMap::<usize, HashSet<usize>>::new();
@@ -167,11 +164,10 @@ pub fn compute_leaf_map(particle_keys: ArrayView1<usize>) -> HashMap<usize, Hash
     }
 
     leaf_key_to_particles
-
 }
 
 /// Given an array of keys. Return the level information of the tree.
-/// 
+///
 /// The function returns a 3-tuple `(max_level, all_keys, level_keys)`.
 /// `max_level` us a `usize` that contains the maximum level of the keys.
 /// The set `all_keys` contains all keys from the tree by completing the tree
@@ -202,7 +198,7 @@ pub fn compute_level_information(
                 leaf_keys
                     .iter()
                     .cloned()
-                    .filter(|&item| item == current_level),
+                    .filter(|&key| find_level(key) == current_level),
             ),
         );
     }
@@ -229,3 +225,25 @@ pub fn compute_level_information(
     (max_level, all_keys, level_keys)
 }
 
+/// Create a regular octree from an array of particles.
+///
+/// Returns the set of all non-empty keys associated with a regular octree created
+/// from an array of particles.
+/// # Arguments
+/// * `particles` - A (3, N) array of particles
+/// * `max_level` - The deepest level of the tree.
+/// * `origin` - The origin of the bounding box.
+/// * `diameter` - The diameter of the bounding box in each dimension.
+pub fn compute_complete_regular_tree<T: RealType>(
+    particles: ArrayView2<T>,
+    max_level: usize,
+    origin: &[f64; 3],
+    diameter: &[f64; 3],
+) -> HashSet<usize> {
+    use super::morton::encode_points;
+
+    let keys = encode_points(particles, max_level, origin, diameter);
+    let (_, all_keys, _) = compute_level_information(keys.view());
+
+    all_keys
+}

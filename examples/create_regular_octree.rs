@@ -6,7 +6,7 @@ use rand::Rng;
 use rusty_tree::octree::*;
 
 const NPARTICLES: usize = 1000000;
-const MAX_LEVEL: usize = 6;
+const MAX_LEVEL: usize = 7;
 
 pub fn main() {
     // Create random particles on the unit sphere.
