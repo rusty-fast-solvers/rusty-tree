@@ -197,8 +197,8 @@ pub fn compute_level_information(
             HashSet::from_iter(
                 leaf_keys
                     .iter()
-                    .cloned()
-                    .filter(|&key| find_level(key) == current_level),
+                    .filter(|&&key| find_level(key) == current_level)
+                    .copied()
             ),
         );
     }
