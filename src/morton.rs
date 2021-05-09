@@ -2,7 +2,7 @@
 
 use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis, Zip};
 use rusty_kernel_tools::RealType;
-use std::collections::{HashSet};
+use std::collections::HashSet;
 
 const X_LOOKUP_ENCODE: [usize; 256] = [
     0x00000000, 0x00000001, 0x00000008, 0x00000009, 0x00000040, 0x00000041, 0x00000048, 0x00000049,
@@ -205,8 +205,11 @@ pub fn point_to_anchor(
 
     let level_size = (1 << level) as f64;
 
-    for (anchor_value, point_value, &origin_value, &diameter_value) in izip!(&mut anchor, point, origin, diameter) {
-        *anchor_value = ((point_value - origin_value) * level_size / diameter_value).floor() as usize
+    for (anchor_value, point_value, &origin_value, &diameter_value) in
+        izip!(&mut anchor, point, origin, diameter)
+    {
+        *anchor_value =
+            ((point_value - origin_value) * level_size / diameter_value).floor() as usize
     }
 
     anchor
@@ -275,11 +278,58 @@ pub fn anchor_to_coordinates(
     let level = anchor[3];
     let level_size = (1 << level) as f64;
 
-    for (&anchor_value, coord_ref, &origin_value, &diameter_value) in izip!(anchor, &mut coord, origin, diameter) {
+    for (&anchor_value, coord_ref, &origin_value, &diameter_value) in
+        izip!(anchor, &mut coord, origin, diameter)
+    {
         *coord_ref = origin_value + diameter_value * (anchor_value as f64) / level_size;
     }
 
     coord
+}
+
+/// Serialized representation of a box associated with a key.
+///
+/// Returns a vector with 24 f64 entries, associated with the 8 x,y,z coordinates
+/// of the box associated with the key.
+/// If the lower left corner of the box is (0, 0, 0). Then the points are numbered in the
+/// following order.
+/// 1. (0, 0, 0)
+/// 2. (1, 0, 0)
+/// 3. (0, 1, 0)
+/// 4. (0, 1, 1)
+/// 5. (0, 0, 1)
+/// 6. (1, 0, 1)
+/// 7. (0, 1, 1)
+/// 8. (1, 1, 1)
+/// 
+/// # Arguments
+/// * `key` - The key for which the box is taken.
+/// `origin` - The origin of the bounding box.
+/// `diameter` - The diameter of the bounding box in each dimension.
+pub fn serialize_box_from_key(key: usize, origin: &[f64; 3], diameter: &[f64; 3]) -> Vec<f64> {
+    let anchor = decode_key(key);
+
+    let mut serialized = Vec::<f64>::with_capacity(24);
+
+    let anchors = [
+        [anchor[0], anchor[1], anchor[2], anchor[3]],
+        [1 + anchor[0], anchor[1], anchor[2], anchor[3]],
+        [anchor[0], 1 + anchor[1], anchor[2], anchor[3]],
+        [1 + anchor[0], 1 + anchor[1], anchor[2], anchor[3]],
+        [anchor[0], anchor[1], 1 + anchor[2], anchor[3]],
+        [1 + anchor[0], anchor[1], 1 + anchor[2], anchor[3]],
+        [anchor[0], 1 + anchor[1], 1 + anchor[2], anchor[3]],
+        [1 + anchor[0], 1 + anchor[1], 1 + anchor[2], anchor[3]],
+    ];
+
+    for anchor in anchors.iter() {
+        let coords = anchor_to_coordinates(anchor, origin, diameter);
+        for index in 0..3 {
+            serialized.push(coords[index]);
+        }
+    }
+
+    serialized
 }
 
 /// Encode many points.
@@ -310,14 +360,17 @@ pub fn encode_points<T: RealType>(
         .and(box_coordinates.axis_iter_mut(Axis(0)))
         .and(origin_view)
         .and(diameter_view)
-        .for_each(|points_row, box_coordinates_row, &origin_value, &diameter_value| {
-            Zip::from(points_row).and(box_coordinates_row).par_for_each(
-                |&point_value, box_coordinate_value| {
-                    let tmp = (point_value.to_f64().unwrap() - origin_value) * level_size / diameter_value;
-                    *box_coordinate_value = tmp.floor() as usize;
-                },
-            )
-        });
+        .for_each(
+            |points_row, box_coordinates_row, &origin_value, &diameter_value| {
+                Zip::from(points_row).and(box_coordinates_row).par_for_each(
+                    |&point_value, box_coordinate_value| {
+                        let tmp = (point_value.to_f64().unwrap() - origin_value) * level_size
+                            / diameter_value;
+                        *box_coordinate_value = tmp.floor() as usize;
+                    },
+                )
+            },
+        );
 
     Zip::from(keys.view_mut())
         .and(box_coordinates.axis_iter(Axis(1)))
@@ -459,13 +512,12 @@ pub fn compute_near_field(key: usize) -> HashSet<usize> {
 }
 
 /// Compute interaction list.
-/// 
+///
 /// The interaction list of a key consists of all the children of the near field of the
 /// parent that are not themselves in the near field of the key.
 /// The function returns a set of all keys that form the interaction list of the
 /// current key.
 pub fn compute_interaction_list(key: usize) -> HashSet<usize> {
-
     let mut interaction_list = HashSet::<usize>::new();
     let level = find_level(key);
 
@@ -480,18 +532,15 @@ pub fn compute_interaction_list(key: usize) -> HashSet<usize> {
     let parent_near_field = compute_near_field(parent);
 
     for &parent_neighbour in parent_near_field.iter() {
-
         let children = find_children(parent_neighbour);
         for &child in children.iter() {
             if !near_field.contains(&child) {
                 interaction_list.insert(child);
             }
         }
-
     }
 
     interaction_list
-
 }
 
 #[cfg(test)]
@@ -571,7 +620,7 @@ mod tests {
     #[test]
     fn test_z_decode_table() {
         for (index, &actual) in Z_LOOKUP_DECODE.iter().enumerate() {
-            let mut expected: usize  = (index >> 2) & 1;
+            let mut expected: usize = (index >> 2) & 1;
             expected |= ((index >> 5) & 1) << 1;
             expected |= ((index >> 8) & 1) << 2;
 
@@ -619,7 +668,11 @@ mod tests {
 
             // Check if box is close to the point.
 
-            let box_diameter = [diameter[0] / level_size, diameter[1] / level_size, diameter[2] / level_size];
+            let box_diameter = [
+                diameter[0] / level_size,
+                diameter[1] / level_size,
+                diameter[2] / level_size,
+            ];
 
             let anchor = decode_key(single_key);
             let coords = anchor_to_coordinates(&anchor, &origin, &diameter);

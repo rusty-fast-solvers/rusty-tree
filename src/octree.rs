@@ -198,7 +198,7 @@ pub fn compute_level_information(
                 leaf_keys
                     .iter()
                     .filter(|&&key| find_level(key) == current_level)
-                    .copied()
+                    .copied(),
             ),
         );
     }
@@ -246,4 +246,60 @@ pub fn compute_complete_regular_tree<T: RealType>(
     let (_, all_keys, _) = compute_level_information(keys.view());
 
     all_keys
+}
+
+/// Export an octree to vtk
+pub fn export_to_vtk<T: RealType>(tree: &Octree<T>, filename: &str) {
+    use super::morton::{serialize_box_from_key};
+    use std::iter::FromIterator;
+    use vtkio::model::*;
+    use std::path::PathBuf;
+
+    let filename = filename.to_owned();
+
+    // We use a vtk voxel type, which has
+    // 8 points per cell, i.e. 24 float numbers
+    // per cell.
+    const POINTS_PER_CELL: usize = 8;
+
+
+    let all_keys = &tree.all_keys;
+    let num_keys = all_keys.len();
+
+    let num_floats = 3 * POINTS_PER_CELL * num_keys;
+
+    let mut cell_points = Vec::<f64>::with_capacity(num_floats);
+
+    for &key in all_keys {
+        let serialized = serialize_box_from_key(key, &tree.origin, &tree.diameter);
+        cell_points.extend(serialized);
+    }
+
+    let connectivity = Vec::<u64>::from_iter(0..(8 * (num_keys as u64)));
+    let offsets = Vec::<u64>::from_iter((0..(num_keys as u64)).map(|item| 8 * item + 8));
+
+
+    let model = Vtk {
+        version: Version { major: 1, minor: 0 },
+        title: String::new(),
+        byte_order: ByteOrder::BigEndian,
+        file_path: Some(PathBuf::from(&filename)),
+        data: DataSet::inline(UnstructuredGridPiece {
+            points: IOBuffer::F64(cell_points),
+            cells: Cells {
+                cell_verts: VertexNumbers::XML {
+                    connectivity: connectivity,
+                    offsets: offsets,
+                },
+                types: vec![CellType::Voxel; num_keys],
+            },
+            data: Attributes {
+                point: vec![],
+                cell: vec![],
+            },
+        }),
+    };
+
+
+    model.export(filename).unwrap();
 }

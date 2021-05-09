@@ -5,8 +5,8 @@ use rand;
 use rand::Rng;
 use rusty_tree::octree::*;
 
-const NPARTICLES: usize = 1000000;
-const MAX_PARTICLES: usize = 200;
+const NPARTICLES: usize = 10000;
+const MAX_PARTICLES: usize = 100;
 
 pub fn main() {
     // Create random particles on the unit sphere.
@@ -21,6 +21,8 @@ pub fn main() {
     }
 
     let balanced_tree = adaptive_octree(particles.view(), MAX_PARTICLES, BalanceMode::Balanced);
+
+    export_to_vtk(&balanced_tree, "./test.vtu");
 
     println!("{}", balanced_tree.statistics);
 }
