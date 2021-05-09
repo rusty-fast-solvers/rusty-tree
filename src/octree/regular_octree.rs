@@ -7,9 +7,7 @@
 
 use super::{Statistics, Octree, OctreeType};
 use ndarray::{ArrayView2, Axis};
-use rayon::prelude::*;
 use rusty_kernel_tools::RealType;
-use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 
@@ -59,62 +57,18 @@ pub fn regular_octree_with_bounding_box<T: RealType>(
     origin: [f64; 3],
     diameter: [f64; 3],
 ) -> Octree<'_, T> {
-    use crate::morton::{compute_interaction_list, compute_near_field, encode_points, find_parent};
-    use std::iter::FromIterator;
+    use crate::morton::{encode_points};
+    use super::{compute_near_field_map, compute_interaction_list_map, compute_leaf_map, compute_level_information};
 
     let now = Instant::now();
 
-    let nlevels: usize = 1 + max_level;
 
     let leaf_keys = encode_points(particles, max_level, &origin, &diameter);
-    let mut leaf_key_to_particles = HashMap::<usize, HashSet<usize>>::new();
+    let (max_level, all_keys, level_keys) = compute_level_information(leaf_keys.view());
+    let leaf_key_to_particles = compute_leaf_map(leaf_keys.view());
 
-    for (particle_index, key) in leaf_keys.iter().enumerate() {
-        if let Some(leaf_set) = leaf_key_to_particles.get_mut(key) {
-            leaf_set.insert(particle_index);
-        } else {
-            let mut new_set = HashSet::<usize>::new();
-            new_set.insert(particle_index);
-            leaf_key_to_particles.insert(*key, new_set);
-        }
-    }
-
-    let mut level_keys = HashMap::<usize, HashSet<usize>>::new();
-    level_keys.insert(max_level, HashSet::from_iter(leaf_keys.iter().cloned()));
-
-    for current_level in (1..nlevels).rev() {
-        let mut parent_level = HashSet::<usize>::new();
-        for &key in level_keys.get(&current_level).unwrap() {
-            parent_level.insert(find_parent(key));
-        }
-        level_keys.insert(current_level - 1, parent_level);
-    }
-
-    let mut all_keys = HashSet::<usize>::new();
-
-    for (_, current_keys) in &level_keys {
-        all_keys = all_keys.union(&current_keys).cloned().collect();
-    }
-
-    let mut near_field = HashMap::<usize, HashSet<usize>>::new();
-    let mut interaction_list = HashMap::<usize, HashSet<usize>>::new();
-
-    for &key in &all_keys {
-        near_field.insert(key, HashSet::<usize>::new());
-        interaction_list.insert(key, HashSet::<usize>::new());
-    }
-
-    near_field.par_iter_mut().for_each(|(&key, hash_set)| {
-        let current_near_field = compute_near_field(key);
-        hash_set.extend(&current_near_field);
-    });
-
-    interaction_list
-        .par_iter_mut()
-        .for_each(|(&key, hash_set)| {
-            let current_interaction_list = compute_interaction_list(key);
-            hash_set.extend(&current_interaction_list);
-        });
+    let near_field = compute_near_field_map(&all_keys);
+    let interaction_list = compute_interaction_list_map(&all_keys);
 
     let duration = now.elapsed();
 

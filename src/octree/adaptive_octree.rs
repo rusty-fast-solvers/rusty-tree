@@ -92,6 +92,8 @@ pub fn adaptive_octree<T: RealType>(
     adaptive_octree_with_bounding_box(particles, max_particles, origin, diameter, balance_mode)
 }
 
+
+
 /// Create an adaptive Octree with given bounding box.
 ///
 /// Returns a `AdaptiveOctree` struct describing an adaptive octree.
@@ -109,13 +111,13 @@ pub fn adaptive_octree_with_bounding_box<T: RealType>(
     diameter: [f64; 3],
     balance_mode: BalanceMode,
 ) -> Octree<'_, T> {
-    use crate::morton::{compute_interaction_list, compute_near_field, find_level, find_parent};
-    use rayon::prelude::*;
-    use std::iter::FromIterator;
-    use itertools::Itertools;
+    use super::{compute_interaction_list_map, compute_near_field_map, compute_leaf_map, compute_level_information};
+
     let number_of_particles = particles.len_of(Axis(1));
 
     let now = Instant::now();
+
+    // First build up the non-adaptive tree by continuous refinement.
 
     let mut particle_keys = Array1::<usize>::zeros(number_of_particles);
     let refine_indices: HashSet<usize> = (0..number_of_particles).collect();
@@ -130,49 +132,7 @@ pub fn adaptive_octree_with_bounding_box<T: RealType>(
         &diameter,
     );
 
-    let max_level = particle_keys
-        .iter()
-        .map(|&item| find_level(item))
-        .max()
-        .unwrap();
-
-    let nlevels = max_level + 1;
-
-    let leaf_keys: HashSet<usize> = particle_keys.iter().copied().collect();
-
-    let mut level_keys = HashMap::<usize, HashSet<usize>>::new();
-
-    // Distribute the keys among different sets for each level
-    for current_level in 0..nlevels {
-        level_keys.insert(
-            current_level,
-            HashSet::from_iter(
-                leaf_keys
-                    .iter()
-                    .cloned()
-                    .filter(|&item| item == current_level),
-            ),
-        );
-    }
-
-    // Now fill up the sets with all the various parent keys.
-    for current_level in (1..nlevels).rev() {
-        let parent_index = current_level - 1;
-        let current_set: HashSet<usize> = level_keys
-            .get(&current_level)
-            .unwrap()
-            .iter()
-            .copied()
-            .collect();
-        let parent_set = level_keys.get_mut(&parent_index).unwrap();
-        parent_set.extend(current_set.iter().map(|&key| find_parent(key)));
-    }
-
-    let mut all_keys = HashSet::<usize>::new();
-
-    for (_, current_keys) in &level_keys {
-        all_keys.extend(current_keys.iter());
-    }
+    let (max_level, mut all_keys, mut level_keys) = compute_level_information(particle_keys.view());
 
     match &balance_mode {
         BalanceMode::Balanced => balance_tree(
@@ -186,34 +146,10 @@ pub fn adaptive_octree_with_bounding_box<T: RealType>(
         _ => (),
     }
 
-    let mut leaf_key_to_particles = HashMap::<usize, HashSet<usize>>::new();
-    for &key in particle_keys.iter().unique() {
-        leaf_key_to_particles.insert(key, HashSet::<usize>::new());
-    }
+    let leaf_key_to_particles = compute_leaf_map(particle_keys.view());
 
-    for (index, key) in particle_keys.iter().enumerate() {
-        leaf_key_to_particles.get_mut(key).unwrap().insert(index);
-    }
-
-    let mut near_field = HashMap::<usize, HashSet<usize>>::new();
-    let mut interaction_list = HashMap::<usize, HashSet<usize>>::new();
-
-    for &key in &all_keys {
-        near_field.insert(key, HashSet::<usize>::new());
-        interaction_list.insert(key, HashSet::<usize>::new());
-    }
-
-    near_field.par_iter_mut().for_each(|(&key, hash_set)| {
-        let current_near_field = compute_near_field(key);
-        hash_set.extend(&current_near_field);
-    });
-
-    interaction_list
-        .par_iter_mut()
-        .for_each(|(&key, hash_set)| {
-            let current_interaction_list = compute_interaction_list(key);
-            hash_set.extend(&current_interaction_list);
-        });
+    let near_field = compute_near_field_map(&all_keys);
+    let interaction_list = compute_interaction_list_map(&all_keys);
 
     let duration = now.elapsed();
 
