@@ -1,6 +1,6 @@
 //! Data structures and functions to create regular and adaptive Octrees.
 
-use ndarray::{Array1, ArrayView1, ArrayView2};
+use ndarray::{Array1, ArrayView1, ArrayView2, Axis};
 use rusty_kernel_tools::RealType;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -262,6 +262,7 @@ pub fn export_to_vtk<T: RealType>(tree: &Octree<T>, filename: &str) {
     // per cell.
     const POINTS_PER_CELL: usize = 8;
 
+    let num_particles = tree.particles.len_of(Axis(1));
 
     let all_keys = &tree.all_keys;
     let num_keys = all_keys.len();
@@ -275,8 +276,27 @@ pub fn export_to_vtk<T: RealType>(tree: &Octree<T>, filename: &str) {
         cell_points.extend(serialized);
     }
 
-    let connectivity = Vec::<u64>::from_iter(0..(8 * (num_keys as u64)));
-    let offsets = Vec::<u64>::from_iter((0..(num_keys as u64)).map(|item| 8 * item + 8));
+    for index in 0..num_particles {
+        cell_points.push(tree.particles[[0, index]].to_f64().unwrap());
+        cell_points.push(tree.particles[[1, index]].to_f64().unwrap());
+        cell_points.push(tree.particles[[2, index]].to_f64().unwrap());
+    }
+
+    let num_points = 8 * (num_keys as u64) + (num_particles as u64);
+
+    let connectivity = Vec::<u64>::from_iter(0..num_points);
+    let mut offsets = Vec::<u64>::from_iter((0..(num_keys as u64)).map(|item| 8 * item + 8));
+    offsets.push(num_points);
+
+    let mut types = vec![CellType::Voxel; num_keys];
+    types.push(CellType::PolyVertex);
+
+    let mut cell_data = Vec::<i32>::with_capacity(num_points as usize);
+
+    for _ in 0..num_keys {
+        cell_data.push(0);
+    }
+    cell_data.push(1);
 
 
     let model = Vtk {
@@ -291,11 +311,18 @@ pub fn export_to_vtk<T: RealType>(tree: &Octree<T>, filename: &str) {
                     connectivity: connectivity,
                     offsets: offsets,
                 },
-                types: vec![CellType::Voxel; num_keys],
+                types: types,
             },
             data: Attributes {
                 point: vec![],
-                cell: vec![],
+                cell: vec![Attribute::DataArray(DataArrayBase {
+                    name: String::from("colors"),
+                    elem: ElementType::Scalars {
+                        num_comp: 1,
+                        lookup_table: None,
+                    },
+                    data: IOBuffer::I32(cell_data),
+                })],
             },
         }),
     };

@@ -22,7 +22,7 @@ pub fn main() {
 
     let balanced_tree = adaptive_octree(particles.view(), MAX_PARTICLES, BalanceMode::Balanced);
 
-    export_to_vtk(&balanced_tree, "./test.vtu");
+    export_to_vtk(&balanced_tree, "./test.vtk");
 
     println!("{}", balanced_tree.statistics);
 }
