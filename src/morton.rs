@@ -360,9 +360,9 @@ pub fn encode_points<T: RealType>(
         .and(box_coordinates.axis_iter_mut(Axis(0)))
         .and(origin_view)
         .and(diameter_view)
-        .for_each(
+        .apply(
             |points_row, box_coordinates_row, &origin_value, &diameter_value| {
-                Zip::from(points_row).and(box_coordinates_row).par_for_each(
+                Zip::from(points_row).and(box_coordinates_row).par_apply(
                     |&point_value, box_coordinate_value| {
                         let tmp = (point_value.to_f64().unwrap() - origin_value) * level_size
                             / diameter_value;
@@ -374,7 +374,7 @@ pub fn encode_points<T: RealType>(
 
     Zip::from(keys.view_mut())
         .and(box_coordinates.axis_iter(Axis(1)))
-        .par_for_each(|key, box_coordinate| {
+        .par_apply(|key, box_coordinate| {
             let anchor: [usize; 4] = [
                 box_coordinate[0],
                 box_coordinate[1],

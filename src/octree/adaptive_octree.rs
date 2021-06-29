@@ -160,7 +160,7 @@ pub fn adaptive_octree_with_bounding_box<T: RealType>(
 
     let statistics = Statistics {
         number_of_particles: particles.len_of(Axis(1)),
-        max_level: max_level,
+        max_level,
         number_of_leafs: leaf_key_to_particles.keys().len(),
         number_of_keys: all_keys.len(),
         creation_time: duration,
@@ -182,21 +182,21 @@ pub fn adaptive_octree_with_bounding_box<T: RealType>(
     };
 
     Octree {
-        particles: particles,
-        particle_keys: particle_keys,
-        max_level: max_level,
-        origin: origin,
-        diameter: diameter,
-        leaf_key_to_particles: leaf_key_to_particles,
-        level_keys: level_keys,
-        interaction_list: interaction_list,
-        near_field: near_field,
-        all_keys: all_keys,
+        particles,
+        particle_keys,
+        max_level,
+        origin,
+        diameter,
+        leaf_key_to_particles,
+        level_keys,
+        interaction_list,
+        near_field,
+        all_keys,
         octree_type: match &balance_mode {
             BalanceMode::Balanced => OctreeType::BalancedAdaptive,
             BalanceMode::Unbalanced => OctreeType::UnbalancedAdaptive,
         },
-        statistics: statistics,
+        statistics,
     }
 }
 

@@ -57,7 +57,7 @@ pub fn regular_octree_with_bounding_box<T: RealType>(
     origin: [f64; 3],
     diameter: [f64; 3],
 ) -> Octree<'_, T> {
-    use crate::morton::{encode_points};
+    use crate::morton::encode_points;
     use super::{compute_near_field_map, compute_interaction_list_map, compute_leaf_map, compute_level_information};
 
     let now = Instant::now();
@@ -74,7 +74,7 @@ pub fn regular_octree_with_bounding_box<T: RealType>(
 
     let statistics = Statistics {
         number_of_particles: particles.len_of(Axis(1)),
-        max_level: max_level,
+        max_level,
         number_of_leafs: leaf_key_to_particles.keys().len(),
         number_of_keys: all_keys.len(),
         creation_time: duration,
@@ -96,17 +96,17 @@ pub fn regular_octree_with_bounding_box<T: RealType>(
     };
 
     Octree {
-        particles: particles,
-        max_level: max_level,
-        origin: origin,
-        diameter: diameter,
-        level_keys: level_keys,
+        particles,
+        max_level,
+        origin,
+        diameter,
+        level_keys,
         particle_keys: leaf_keys,
-        near_field: near_field,
-        interaction_list: interaction_list,
-        leaf_key_to_particles: leaf_key_to_particles,
-        all_keys: all_keys,
+        near_field,
+        interaction_list,
+        leaf_key_to_particles,
+        all_keys,
         octree_type: OctreeType::Regular,
-        statistics: statistics,
+        statistics,
     }
 }
