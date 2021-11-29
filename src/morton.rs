@@ -1,10 +1,336 @@
 //! Routines for Morton encoding and decoding.
 
-use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis, Zip};
-use rusty_kernel_tools::RealType;
-use std::collections::HashSet;
+use itertools::izip;
 
-const X_LOOKUP_ENCODE: [usize; 256] = [
+use std::cmp::Ordering;
+
+use crate::types::Domain;
+use crate::types::KeyType;
+use crate::types::PointType;
+
+const DEEPEST_LEVEL: KeyType = 16;
+const LEVEL_SIZE: KeyType = 1 << DEEPEST_LEVEL;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+/// Representation of a Morton key.
+pub struct MortonKey {
+    anchor: [KeyType; 3],
+    morton: KeyType,
+}
+
+impl MortonKey {
+    /// Return the anchor
+    pub fn anchor(&self) -> &[KeyType; 3] {
+        &self.anchor
+    }
+
+    /// Return the Morton representation
+    pub fn morton(&self) -> KeyType {
+        self.morton
+    }
+
+    /// Return the level
+    pub fn level(&self) -> KeyType {
+        find_level(self.morton)
+    }
+
+    /// Return a `MortonKey` type from a Morton index
+    pub fn from_morton(morton: KeyType) -> Self {
+        let anchor = decode_key(morton);
+
+        MortonKey { anchor, morton }
+    }
+
+    /// Return a `MortonKey` type from the anchor on the deepest level
+    pub fn from_anchor(anchor: &[KeyType; 3]) -> Self {
+        let morton = encode_anchor(&anchor, DEEPEST_LEVEL);
+
+        MortonKey {
+            anchor: anchor.to_owned(),
+            morton: morton,
+        }
+    }
+
+    /// Return a `MortonKey` associated with the box that encloses the point on the deepest level
+    pub fn from_point(point: &[PointType; 3], domain: &Domain) -> Self {
+        let anchor = point_to_anchor(&point, DEEPEST_LEVEL, &domain.origin, &domain.diameter);
+        MortonKey::from_anchor(&anchor)
+    }
+
+    /// Return the parent
+    pub fn parent(&self) -> Self {
+        let level = self.level();
+        let morton = self.morton >> LEVEL_DISPLACEMENT;
+
+        let parent_level = level - 1;
+        let parent_morton_without_level = (morton >> 3) << 3; // Zeros out the last 3 bits of the Morton index
+
+        let parent_morton = (parent_morton_without_level << LEVEL_DISPLACEMENT) | parent_level;
+
+        MortonKey::from_morton(parent_morton)
+    }
+
+    /// Return the first child
+    pub fn first_child(&self) -> Self {
+        MortonKey {
+            anchor: self.anchor,
+            morton: 1 + self.morton,
+        }
+    }
+
+    /// Return all children in order of their Morton indices
+    pub fn children(&self) -> Vec<MortonKey> {
+        let level = self.level();
+        let morton = self.morton() >> LEVEL_DISPLACEMENT;
+
+        let mut children_morton: [KeyType; 8] = [0; 8];
+        let mut children: Vec<MortonKey> = Vec::with_capacity(8);
+        for (index, item) in children_morton.iter_mut().enumerate() {
+            *item = ((morton | index as KeyType) << LEVEL_DISPLACEMENT) | (level + 1);
+        }
+
+        for &child_morton in children_morton.iter() {
+            children.push(MortonKey::from_morton(child_morton))
+        }
+
+        children
+    }
+
+    /// Return all children of the parent of the current Morton index
+    pub fn siblings(&self) -> Vec<MortonKey> {
+        self.parent().children()
+    }
+
+    /// Return a point with the coordinates of the anchor
+    pub fn to_coordinates(&self, domain: &Domain) -> [PointType; 3] {
+        let mut coord: [PointType; 3] = [0.0; 3];
+
+        for (anchor_value, coord_ref, origin_value, diameter_value) in
+            izip!(self.anchor, &mut coord, &domain.origin, &domain.diameter)
+        {
+            *coord_ref = origin_value
+                + diameter_value * (anchor_value as PointType) / (LEVEL_SIZE as PointType);
+        }
+
+        coord
+    }
+
+    /// Serialized representation of a box associated with a key.
+    ///
+    /// Returns a vector with 24 entries, associated with the 8 x,y,z coordinates
+    /// of the box associated with the key.
+    /// If the lower left corner of the box is (0, 0, 0). Then the points are numbered in the
+    /// following order.
+    /// 1. (0, 0, 0)
+    /// 2. (1, 0, 0)
+    /// 3. (0, 1, 0)
+    /// 4. (1, 1, 0)
+    /// 5. (0, 0, 1)
+    /// 6. (1, 0, 1)
+    /// 7. (0, 1, 1)
+    /// 8. (1, 1, 1)
+    ///
+    /// # Arguments
+    /// * `domain` - The domain descriptor.
+    pub fn box_coordinates(&self, domain: &Domain) -> Vec<f64> {
+        let mut serialized = Vec::<f64>::with_capacity(24);
+
+        let anchors = [
+            [self.anchor[0], self.anchor[1], self.anchor[2]],
+            [1 + self.anchor[0], self.anchor[1], self.anchor[2]],
+            [self.anchor[0], 1 + self.anchor[1], self.anchor[2]],
+            [1 + self.anchor[0], 1 + self.anchor[1], self.anchor[2]],
+            [self.anchor[0], self.anchor[1], 1 + self.anchor[2]],
+            [1 + self.anchor[0], self.anchor[1], 1 + self.anchor[2]],
+            [self.anchor[0], 1 + self.anchor[1], 1 + self.anchor[2]],
+            [1 + self.anchor[0], 1 + self.anchor[1], 1 + self.anchor[2]],
+        ];
+
+        for anchor in anchors.iter() {
+            let mut coord: [PointType; 3] = [0.0; 3];
+            for (&anchor_value, coord_ref, origin_value, diameter_value) in
+                izip!(anchor, &mut coord, &domain.origin, &domain.diameter)
+            {
+                *coord_ref = origin_value
+                    + diameter_value * (anchor_value as PointType) / (LEVEL_SIZE as PointType);
+            }
+
+            for index in 0..3 {
+                serialized.push(coord[index]);
+            }
+        }
+
+        serialized
+    }
+
+    /// Return the anchor of the ancestor or descendent at the given level
+    /// Note that if `level > self.level()` then the returned anchor is the
+    /// same as `self.anchor`. The anchor
+    pub fn anchor_at_level(&self, level: KeyType) -> [KeyType; 3] {
+        let level_diff = (self.level() as i32) - (level as i32);
+
+        if level_diff <= 0 {
+            self.anchor().to_owned()
+        } else {
+            let mut parent = self.to_owned();
+            for _ in 0..level_diff {
+                parent = parent.parent();
+            }
+
+            parent.anchor().to_owned()
+        }
+    }
+
+    /// Find key in a given direction.
+    ///
+    /// Returns the key obtained by moving direction\[j\] boxes into direction j
+    /// starting from the anchor associated with the given key.
+    /// Negative steps are possible. If the result is out of bounds,
+    /// i.e. anchor\[j\] + direction\[j\] is negative or larger than the number of boxes
+    /// across each dimension, `None` is returned. Otherwise, `Some(new_key)` is returned,
+    /// where `new_key` is the Morton key after moving into the given direction.
+    ///
+    /// # Arguments
+    /// * `direction` - A vector describing how many boxes we move along each coordinate direction.
+    ///               Negative values are possible (meaning that we move backwards).
+    pub fn find_key_in_direction(&self, direction: &[i64; 3]) -> Option<MortonKey> {
+        let level = self.level();
+
+        let max_number_of_boxes: i64 = 1 << level;
+        let step_multiplier: i64 = (1 << (DEEPEST_LEVEL - level)) as i64;
+
+        let x: i64 = self.anchor[0] as i64;
+        let y: i64 = self.anchor[1] as i64;
+        let z: i64 = self.anchor[2] as i64;
+
+        let x = x + step_multiplier * direction[0];
+        let y = y + step_multiplier * direction[1];
+        let z = z + step_multiplier * direction[2];
+
+        if (x >= 0)
+            & (y >= 0)
+            & (z >= 0)
+            & (x < max_number_of_boxes)
+            & (y < max_number_of_boxes)
+            & (z < max_number_of_boxes)
+        {
+            let new_anchor: [KeyType; 3] = [x as KeyType, y as KeyType, z as KeyType];
+            let new_morton = encode_anchor(&new_anchor, level);
+            Some(MortonKey {
+                anchor: new_anchor,
+                morton: new_morton,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl PartialEq for MortonKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.morton == other.morton
+    }
+}
+
+impl Eq for MortonKey {}
+
+impl Ord for MortonKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.morton.cmp(&other.morton)
+    }
+}
+
+impl PartialOrd for MortonKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(&other))
+    }
+}
+
+/// Return the level associated with a key.
+fn find_level(morton: KeyType) -> KeyType {
+    return morton & LEVEL_MASK;
+}
+
+/// Helper function for decoding keys.
+fn decode_key_helper(key: KeyType, lookup_table: &[KeyType; 512]) -> KeyType {
+    const N_LOOPS: KeyType = 7; // 8 bytes in 64 bit key
+    let mut coord: KeyType = 0;
+
+    for index in 0..N_LOOPS {
+        coord |= lookup_table[((key >> (index * 9)) & NINE_BIT_MASK) as usize] << (3 * index);
+    }
+
+    coord
+}
+
+/// Decode a given key.
+///
+/// Returns the anchor for the given Morton key
+fn decode_key(morton: KeyType) -> [KeyType; 3] {
+    let key = morton >> LEVEL_DISPLACEMENT;
+
+    let x = decode_key_helper(key, &X_LOOKUP_DECODE);
+    let y = decode_key_helper(key, &Y_LOOKUP_DECODE);
+    let z = decode_key_helper(key, &Z_LOOKUP_DECODE);
+
+    [x, y, z]
+}
+
+/// Map a point to the anchor of the enclosing box.
+///
+/// Returns the 3 integeger coordinates of the enclosing box.
+///
+/// # Arguments
+/// `point` - The (x, y, z) coordinates of the point to map.
+/// `level` - The level of the tree at which the point will be mapped.
+/// `origin` - The origin of the bounding box.
+/// `diameter` - The diameter of the bounding box in each dimension.
+fn point_to_anchor(
+    point: &[PointType; 3],
+    level: KeyType,
+    origin: &[PointType; 3],
+    diameter: &[PointType; 3],
+) -> [KeyType; 3] {
+    let mut anchor: [KeyType; 3] = [0, 0, 0];
+
+    let level_size = (1 << level) as PointType;
+
+    for (anchor_value, point_value, &origin_value, &diameter_value) in
+        izip!(&mut anchor, point, origin, diameter)
+    {
+        *anchor_value =
+            ((point_value - origin_value) * level_size / diameter_value).floor() as KeyType
+    }
+
+    anchor
+}
+
+/// Encode an anchor.
+///
+/// Returns the Morton key associated with the given anchor.
+///
+/// # Arguments
+/// `anchor` - A vector with 4 elements defining the integer coordinates and level.
+fn encode_anchor(anchor: &[KeyType; 3], level: KeyType) -> KeyType {
+    let x = anchor[0];
+    let y = anchor[1];
+    let z = anchor[2];
+
+    let key: KeyType = Z_LOOKUP_ENCODE[((z >> BYTE_DISPLACEMENT) & BYTE_MASK) as usize]
+        | Y_LOOKUP_ENCODE[((y >> BYTE_DISPLACEMENT) & BYTE_MASK) as usize]
+        | X_LOOKUP_ENCODE[((x >> BYTE_DISPLACEMENT) & BYTE_MASK) as usize];
+
+    let key = (key << 24)
+        | Z_LOOKUP_ENCODE[(z & BYTE_MASK) as usize]
+        | Y_LOOKUP_ENCODE[(y & BYTE_MASK) as usize]
+        | X_LOOKUP_ENCODE[(x & BYTE_MASK) as usize];
+
+    let key = key << LEVEL_DISPLACEMENT;
+    key | level
+}
+
+const X_LOOKUP_ENCODE: [KeyType; 256] = [
     0x00000000, 0x00000001, 0x00000008, 0x00000009, 0x00000040, 0x00000041, 0x00000048, 0x00000049,
     0x00000200, 0x00000201, 0x00000208, 0x00000209, 0x00000240, 0x00000241, 0x00000248, 0x00000249,
     0x00001000, 0x00001001, 0x00001008, 0x00001009, 0x00001040, 0x00001041, 0x00001048, 0x00001049,
@@ -39,7 +365,7 @@ const X_LOOKUP_ENCODE: [usize; 256] = [
     0x00249200, 0x00249201, 0x00249208, 0x00249209, 0x00249240, 0x00249241, 0x00249248, 0x00249249,
 ];
 
-const Y_LOOKUP_ENCODE: [usize; 256] = [
+const Y_LOOKUP_ENCODE: [KeyType; 256] = [
     0x00000000, 0x00000002, 0x00000010, 0x00000012, 0x00000080, 0x00000082, 0x00000090, 0x00000092,
     0x00000400, 0x00000402, 0x00000410, 0x00000412, 0x00000480, 0x00000482, 0x00000490, 0x00000492,
     0x00002000, 0x00002002, 0x00002010, 0x00002012, 0x00002080, 0x00002082, 0x00002090, 0x00002092,
@@ -74,7 +400,7 @@ const Y_LOOKUP_ENCODE: [usize; 256] = [
     0x00492400, 0x00492402, 0x00492410, 0x00492412, 0x00492480, 0x00492482, 0x00492490, 0x00492492,
 ];
 
-const Z_LOOKUP_ENCODE: [usize; 256] = [
+const Z_LOOKUP_ENCODE: [KeyType; 256] = [
     0x00000000, 0x00000004, 0x00000020, 0x00000024, 0x00000100, 0x00000104, 0x00000120, 0x00000124,
     0x00000800, 0x00000804, 0x00000820, 0x00000824, 0x00000900, 0x00000904, 0x00000920, 0x00000924,
     0x00004000, 0x00004004, 0x00004020, 0x00004024, 0x00004100, 0x00004104, 0x00004120, 0x00004124,
@@ -109,7 +435,7 @@ const Z_LOOKUP_ENCODE: [usize; 256] = [
     0x00924800, 0x00924804, 0x00924820, 0x00924824, 0x00924900, 0x00924904, 0x00924920, 0x00924924,
 ];
 
-const X_LOOKUP_DECODE: [usize; 512] = [
+const X_LOOKUP_DECODE: [KeyType; 512] = [
     0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3, 0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3,
     0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3, 0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3,
     4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7,
@@ -128,7 +454,7 @@ const X_LOOKUP_DECODE: [usize; 512] = [
     4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7,
 ];
 
-const Y_LOOKUP_DECODE: [usize; 512] = [
+const Y_LOOKUP_DECODE: [KeyType; 512] = [
     0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3,
     0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3,
     0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3,
@@ -147,7 +473,7 @@ const Y_LOOKUP_DECODE: [usize; 512] = [
     4, 4, 5, 5, 4, 4, 5, 5, 4, 4, 5, 5, 4, 4, 5, 5, 6, 6, 7, 7, 6, 6, 7, 7, 6, 6, 7, 7, 6, 6, 7, 7,
 ];
 
-const Z_LOOKUP_DECODE: [usize; 512] = [
+const Z_LOOKUP_DECODE: [KeyType; 512] = [
     0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1,
     2, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3,
     0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1,
@@ -170,378 +496,14 @@ const Z_LOOKUP_DECODE: [usize; 512] = [
 const LEVEL_DISPLACEMENT: usize = 15;
 
 // Mask for the last 15 bits.
-const LEVEL_MASK: usize = 0x7FFF;
+const LEVEL_MASK: KeyType = 0x7FFF;
 
 // Mask for lowest order byte.
-const BYTE_MASK: usize = 0xFF;
-const BYTE_DISPLACEMENT: usize = 8;
+const BYTE_MASK: KeyType = 0xFF;
+const BYTE_DISPLACEMENT: KeyType = 8;
 
 // Mask encapsulating a bit.
-const NINE_BIT_MASK: usize = 0x1FF;
-
-/// Return the level associated with a key.
-pub fn find_level(key: usize) -> usize {
-    return key & LEVEL_MASK;
-}
-
-/// Map a point to the integer coordinates of its enclosing box.
-///
-/// Returns the 3 integeger coordinates of the enclosing box.
-///
-/// # Arguments
-/// `point` - The (x, y, z) coordinates of the point to map.
-/// `level` - The level of the tree at which the point will be mapped.
-/// `origin` - The origin of the bounding box.
-/// `diameter` - The diameter of the bounding box in each dimension.
-pub fn point_to_anchor(
-    point: &[f64; 3],
-    level: usize,
-    origin: &[f64; 3],
-    diameter: &[f64; 3],
-) -> [usize; 4] {
-    use itertools::izip;
-    let mut anchor: [usize; 4] = [0, 0, 0, 0];
-    anchor[3] = level;
-
-    let level_size = (1 << level) as f64;
-
-    for (anchor_value, point_value, &origin_value, &diameter_value) in
-        izip!(&mut anchor, point, origin, diameter)
-    {
-        *anchor_value =
-            ((point_value - origin_value) * level_size / diameter_value).floor() as usize
-    }
-
-    anchor
-}
-
-/// Encode an anchor.
-///
-/// Returns the Morton key associated with the given anchor.
-///
-/// # Arguments
-/// `anchor` - A vector with 4 elements defining the integer coordinates and level.
-pub fn encode_anchor(anchor: &[usize; 4]) -> usize {
-    let x = anchor[0];
-    let y = anchor[1];
-    let z = anchor[2];
-    let level = anchor[3];
-
-    let key: usize = Z_LOOKUP_ENCODE[(z >> BYTE_DISPLACEMENT) & BYTE_MASK]
-        | Y_LOOKUP_ENCODE[(y >> BYTE_DISPLACEMENT) & BYTE_MASK]
-        | X_LOOKUP_ENCODE[(x >> BYTE_DISPLACEMENT) & BYTE_MASK];
-
-    let key = (key << 24)
-        | Z_LOOKUP_ENCODE[z & BYTE_MASK]
-        | Y_LOOKUP_ENCODE[y & BYTE_MASK]
-        | X_LOOKUP_ENCODE[x & BYTE_MASK];
-
-    let key = key << LEVEL_DISPLACEMENT;
-    key | level
-}
-
-/// Encode a point.
-///
-/// Return the Morton key of a point for a given level.
-///
-/// # Arguments
-/// `point` - The (x, y, z) coordinates of the point to map.
-/// `level` - The level of the tree at which the point will be mapped.
-/// `origin` - The origin of the bounding box.
-/// `diameter` - The diameter of the bounding box in each dimension.
-pub fn encode_point(
-    point: &[f64; 3],
-    level: usize,
-    origin: &[f64; 3],
-    diameter: &[f64; 3],
-) -> usize {
-    let anchor = point_to_anchor(point, level, origin, diameter);
-    encode_anchor(&anchor)
-}
-
-/// Given an anchor, return the corresponding x,y,z coordinates.
-///
-/// The result is the coordinates of the lower left corner of the box described by the given anchor.
-///
-/// # Arguments
-/// `anchor` - The three indices describing the box and the level information.
-/// `origin` - The origin of the bounding box.
-/// `diameter` - The diameter of the bounding box in each dimension.
-pub fn anchor_to_coordinates(
-    anchor: &[usize; 4],
-    origin: &[f64; 3],
-    diameter: &[f64; 3],
-) -> [f64; 3] {
-    use itertools::izip;
-    let mut coord: [f64; 3] = [0.0; 3];
-
-    let level = anchor[3];
-    let level_size = (1 << level) as f64;
-
-    for (&anchor_value, coord_ref, &origin_value, &diameter_value) in
-        izip!(anchor, &mut coord, origin, diameter)
-    {
-        *coord_ref = origin_value + diameter_value * (anchor_value as f64) / level_size;
-    }
-
-    coord
-}
-
-/// Serialized representation of a box associated with a key.
-///
-/// Returns a vector with 24 f64 entries, associated with the 8 x,y,z coordinates
-/// of the box associated with the key.
-/// If the lower left corner of the box is (0, 0, 0). Then the points are numbered in the
-/// following order.
-/// 1. (0, 0, 0)
-/// 2. (1, 0, 0)
-/// 3. (0, 1, 0)
-/// 4. (0, 1, 1)
-/// 5. (0, 0, 1)
-/// 6. (1, 0, 1)
-/// 7. (0, 1, 1)
-/// 8. (1, 1, 1)
-/// 
-/// # Arguments
-/// * `key` - The key for which the box is taken.
-/// `origin` - The origin of the bounding box.
-/// `diameter` - The diameter of the bounding box in each dimension.
-pub fn serialize_box_from_key(key: usize, origin: &[f64; 3], diameter: &[f64; 3]) -> Vec<f64> {
-    let anchor = decode_key(key);
-
-    let mut serialized = Vec::<f64>::with_capacity(24);
-
-    let anchors = [
-        [anchor[0], anchor[1], anchor[2], anchor[3]],
-        [1 + anchor[0], anchor[1], anchor[2], anchor[3]],
-        [anchor[0], 1 + anchor[1], anchor[2], anchor[3]],
-        [1 + anchor[0], 1 + anchor[1], anchor[2], anchor[3]],
-        [anchor[0], anchor[1], 1 + anchor[2], anchor[3]],
-        [1 + anchor[0], anchor[1], 1 + anchor[2], anchor[3]],
-        [anchor[0], 1 + anchor[1], 1 + anchor[2], anchor[3]],
-        [1 + anchor[0], 1 + anchor[1], 1 + anchor[2], anchor[3]],
-    ];
-
-    for anchor in anchors.iter() {
-        let coords = anchor_to_coordinates(anchor, origin, diameter);
-        for index in 0..3 {
-            serialized.push(coords[index]);
-        }
-    }
-
-    serialized
-}
-
-/// Encode many points.
-///
-/// Return an array containing all Morton keys of a given array of points.
-///
-/// # Arguments
-/// `point` - A (3 ,N) array of N points of type f32 or f64.
-/// `level` - The level of the tree at which the point will be mapped.
-/// `origin` - The origin of the bounding box.
-/// `diameter` - The diameter of the bounding box in each dimension.
-pub fn encode_points<T: RealType>(
-    points: ArrayView2<T>,
-    level: usize,
-    origin: &[f64; 3],
-    diameter: &[f64; 3],
-) -> Array1<usize> {
-    let npoints = points.len_of(Axis(1));
-    let mut box_coordinates = Array2::<usize>::zeros((3, npoints));
-    let mut keys = Array1::<usize>::zeros(npoints);
-
-    let level_size = (1 << level) as f64;
-
-    let origin_view = ArrayView1::from(origin);
-    let diameter_view = ArrayView1::from(diameter);
-
-    Zip::from(points.axis_iter(Axis(0)))
-        .and(box_coordinates.axis_iter_mut(Axis(0)))
-        .and(origin_view)
-        .and(diameter_view)
-        .apply(
-            |points_row, box_coordinates_row, &origin_value, &diameter_value| {
-                Zip::from(points_row).and(box_coordinates_row).par_apply(
-                    |&point_value, box_coordinate_value| {
-                        let tmp = (point_value.to_f64().unwrap() - origin_value) * level_size
-                            / diameter_value;
-                        *box_coordinate_value = tmp.floor() as usize;
-                    },
-                )
-            },
-        );
-
-    Zip::from(keys.view_mut())
-        .and(box_coordinates.axis_iter(Axis(1)))
-        .par_apply(|key, box_coordinate| {
-            let anchor: [usize; 4] = [
-                box_coordinate[0],
-                box_coordinate[1],
-                box_coordinate[2],
-                level,
-            ];
-            *key = encode_anchor(&anchor);
-        });
-
-    keys
-}
-
-/// Helper function for decoding keys.
-fn decode_key_helper(key: usize, lookup_table: &[usize; 512]) -> usize {
-    const N_LOOPS: usize = 7; // 8 bytes in 64 bit key
-    let mut coord: usize = 0;
-
-    for index in 0..N_LOOPS {
-        coord |= lookup_table[(key >> (index * 9)) & NINE_BIT_MASK] << (3 * index);
-    }
-
-    coord
-}
-
-/// Decode a given key.
-///
-/// Returns an array containing the three coordinates and level of the key.
-pub fn decode_key(key: usize) -> [usize; 4] {
-    let level = find_level(key);
-    let key = key >> LEVEL_DISPLACEMENT;
-
-    let x = decode_key_helper(key, &X_LOOKUP_DECODE);
-    let y = decode_key_helper(key, &Y_LOOKUP_DECODE);
-    let z = decode_key_helper(key, &Z_LOOKUP_DECODE);
-
-    [x, y, z, level]
-}
-
-/// Return the key of the parent node.
-pub fn find_parent(key: usize) -> usize {
-    let level = find_level(key);
-    let key = key >> LEVEL_DISPLACEMENT;
-
-    let parent_level = level - 1;
-
-    ((key >> 3) << LEVEL_DISPLACEMENT) | parent_level
-}
-
-/// Return all children of a given key.
-pub fn find_children(key: usize) -> [usize; 8] {
-    let level = find_level(key);
-    let key = key >> LEVEL_DISPLACEMENT;
-
-    let mut children: [usize; 8] = [0; 8];
-
-    let root = (key >> 3) << 3;
-
-    for (index, item) in children.iter_mut().enumerate() {
-        *item = ((root | index) << LEVEL_DISPLACEMENT) | (level + 1);
-    }
-
-    children
-}
-
-/// Return all siblings of a key.
-///
-/// For a given key this function returns all 8 children
-/// of the parent of the key. Hence, the key itself is
-/// returned as well.
-pub fn find_siblings(key: usize) -> [usize; 8] {
-    let parent = find_parent(key);
-    find_children(parent)
-}
-
-/// Find key in a given direction.
-///
-/// Returns the key obtained by moving direction\[j\] boxes into direction j
-/// starting from the anchor associated with the given key.
-/// Negative steps are possible. If the result is out of bounds,
-/// i.e. anchor\[j\] + direction\[j\] is negative or larger than the number of boxes
-/// across each dimension, `None` is returned. Otherwise, `Some(new_key)` is returned,
-/// where `new_key` is the Morton key after moving into the given direction.
-///
-/// # Arguments
-/// `key` - The starting key.
-/// `direction` - A vector describing how many boxes we move along each coordinate direction.
-///               Negative values are possible (meaning that we move backwards).
-pub fn find_key_in_direction(key: usize, direction: &[i64; 3]) -> Option<usize> {
-    let anchor = decode_key(key);
-
-    let level = anchor[3];
-
-    let max_number_of_boxes: i64 = 1 << level;
-
-    let x: i64 = anchor[0] as i64;
-    let y: i64 = anchor[1] as i64;
-    let z: i64 = anchor[2] as i64;
-
-    let x = x + direction[0];
-    let y = y + direction[1];
-    let z = z + direction[2];
-
-    if (x >= 0)
-        & (y >= 0)
-        & (z >= 0)
-        & (x < max_number_of_boxes)
-        & (y < max_number_of_boxes)
-        & (z < max_number_of_boxes)
-    {
-        let new_anchor: [usize; 4] = [x as usize, y as usize, z as usize, level];
-        Some(encode_anchor(&new_anchor))
-    } else {
-        None
-    }
-}
-
-/// Compute near field.
-///
-/// The near field is the set of all boxes that are bordering the current box, including the box itself.
-///
-/// # Arguments
-/// `key` - The key for which we want to compute the neighbours.
-pub fn compute_near_field(key: usize) -> HashSet<usize> {
-    let mut near_field = HashSet::<usize>::new();
-
-    use itertools::iproduct;
-
-    for (i, j, k) in iproduct!(0..3, 0..3, 0..3) {
-        let direction: [i64; 3] = [i - 1, j - 1, k - 1];
-        if let Some(key) = find_key_in_direction(key, &direction) {
-            near_field.insert(key);
-        }
-    }
-    near_field
-}
-
-/// Compute interaction list.
-///
-/// The interaction list of a key consists of all the children of the near field of the
-/// parent that are not themselves in the near field of the key.
-/// The function returns a set of all keys that form the interaction list of the
-/// current key.
-pub fn compute_interaction_list(key: usize) -> HashSet<usize> {
-    let mut interaction_list = HashSet::<usize>::new();
-    let level = find_level(key);
-
-    if level < 2 {
-        // Levels zero and one always have empty interaction lists.
-        return interaction_list;
-    }
-
-    let near_field = compute_near_field(key);
-
-    let parent = find_parent(key);
-    let parent_near_field = compute_near_field(parent);
-
-    for &parent_neighbour in parent_near_field.iter() {
-        let children = find_children(parent_neighbour);
-        for &child in children.iter() {
-            if !near_field.contains(&child) {
-                interaction_list.insert(child);
-            }
-        }
-    }
-
-    interaction_list
-}
+const NINE_BIT_MASK: KeyType = 0x1FF;
 
 #[cfg(test)]
 mod tests {
@@ -551,10 +513,10 @@ mod tests {
     #[test]
     fn test_x_encode_table() {
         for (mut index, actual) in X_LOOKUP_ENCODE.iter().enumerate() {
-            let mut sum: usize = 0;
+            let mut sum: KeyType = 0;
 
             for shift in 0..8 {
-                sum |= (index & 1) << (3 * shift);
+                sum |= ((index & 1) << (3 * shift)) as KeyType;
                 index = index >> 1;
             }
 
@@ -566,10 +528,10 @@ mod tests {
     #[test]
     fn test_y_encode_table() {
         for (mut index, actual) in Y_LOOKUP_ENCODE.iter().enumerate() {
-            let mut sum: usize = 0;
+            let mut sum: KeyType = 0;
 
             for shift in 0..8 {
-                sum |= (index & 1) << (3 * shift + 1);
+                sum |= ((index & 1) << (3 * shift + 1)) as KeyType;
                 index = index >> 1;
             }
 
@@ -581,10 +543,10 @@ mod tests {
     #[test]
     fn test_z_encode_table() {
         for (mut index, actual) in Z_LOOKUP_ENCODE.iter().enumerate() {
-            let mut sum: usize = 0;
+            let mut sum: KeyType = 0;
 
             for shift in 0..8 {
-                sum |= (index & 1) << (3 * shift + 2);
+                sum |= ((index & 1) << (3 * shift + 2)) as KeyType;
                 index = index >> 1;
             }
 
@@ -596,9 +558,9 @@ mod tests {
     #[test]
     fn test_x_decode_table() {
         for (index, &actual) in X_LOOKUP_DECODE.iter().enumerate() {
-            let mut expected: usize = index & 1;
-            expected |= ((index >> 3) & 1) << 1;
-            expected |= ((index >> 6) & 1) << 2;
+            let mut expected: KeyType = (index & 1) as KeyType;
+            expected |= (((index >> 3) & 1) << 1) as KeyType;
+            expected |= (((index >> 6) & 1) << 2) as KeyType;
 
             assert_eq!(actual, expected);
         }
@@ -608,9 +570,9 @@ mod tests {
     #[test]
     fn test_y_decode_table() {
         for (index, &actual) in Y_LOOKUP_DECODE.iter().enumerate() {
-            let mut expected: usize = (index >> 1) & 1;
-            expected |= ((index >> 4) & 1) << 1;
-            expected |= ((index >> 7) & 1) << 2;
+            let mut expected: KeyType = ((index >> 1) & 1) as KeyType;
+            expected |= (((index >> 4) & 1) << 1) as KeyType;
+            expected |= (((index >> 7) & 1) << 2) as KeyType;
 
             assert_eq!(actual, expected);
         }
@@ -620,9 +582,9 @@ mod tests {
     #[test]
     fn test_z_decode_table() {
         for (index, &actual) in Z_LOOKUP_DECODE.iter().enumerate() {
-            let mut expected: usize = (index >> 2) & 1;
-            expected |= ((index >> 5) & 1) << 1;
-            expected |= ((index >> 8) & 1) << 2;
+            let mut expected: KeyType = ((index >> 2) & 1) as KeyType;
+            expected |= (((index >> 5) & 1) << 1) as KeyType;
+            expected |= (((index >> 8) & 1) << 2) as KeyType;
 
             assert_eq!(actual, expected);
         }
@@ -630,56 +592,11 @@ mod tests {
 
     /// Test encoding and decoding an anchor
     #[test]
-    fn test_encoding_decodiing() {
-        let anchor: [usize; 4] = [65535, 65535, 65535, 16];
+    fn test_encoding_decoding() {
+        let anchor: [KeyType; 3] = [65535, 65535, 65535];
 
-        let actual = decode_key(encode_anchor(&anchor));
+        let actual = decode_key(encode_anchor(&anchor, DEEPEST_LEVEL));
 
         assert_eq!(anchor, actual);
-    }
-
-    /// Test encoding many points
-    #[test]
-    fn test_encode_many_points() {
-        use rand::prelude::*;
-
-        const NPOINTS: usize = 100;
-        const LEVEL: usize = 4;
-
-        let mut rng = rand::thread_rng();
-
-        let mut points = Array2::<f64>::zeros((3, NPOINTS));
-
-        points.iter_mut().for_each(|item| *item = rng.gen::<f64>());
-
-        let origin = [-0.1, -0.2, 0.0];
-        let diameter = [1.2, 1.3, 1.01];
-        let keys = encode_points(points.view(), LEVEL, &origin, &diameter);
-
-        let level_size = (1 << LEVEL) as f64;
-
-        for (point, &key) in points.axis_iter(Axis(1)).zip(keys.iter()) {
-            let point_arr = [point[0], point[1], point[2]];
-            let single_key = encode_point(&point_arr, LEVEL, &origin, &diameter);
-
-            // Check that the key via encode_point is the same as the key via encode_points
-
-            assert_eq!(single_key, key);
-
-            // Check if box is close to the point.
-
-            let box_diameter = [
-                diameter[0] / level_size,
-                diameter[1] / level_size,
-                diameter[2] / level_size,
-            ];
-
-            let anchor = decode_key(single_key);
-            let coords = anchor_to_coordinates(&anchor, &origin, &diameter);
-            for dim in 0..3 {
-                assert!(coords[dim] <= point_arr[dim]);
-                assert!(point_arr[dim] < coords[dim] + box_diameter[dim]);
-            }
-        }
     }
 }
