@@ -17,6 +17,6 @@ Cargo.lock
 *.so
 
 build_and_test.sh
-rusty_green_kernel/rusty_green_kernel/*
+rusty_tree/rusty_tree/*
 
 .vscode/*
