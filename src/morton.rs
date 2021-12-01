@@ -135,16 +135,19 @@ impl MortonKey {
     /// * `domain` - The domain descriptor.
     pub fn box_coordinates(&self, domain: &Domain) -> Vec<f64> {
         let mut serialized = Vec::<f64>::with_capacity(24);
+        let level = self.level();
+        let step = (1 << (DEEPEST_LEVEL - level)) as u64;
+
 
         let anchors = [
             [self.anchor[0], self.anchor[1], self.anchor[2]],
-            [1 + self.anchor[0], self.anchor[1], self.anchor[2]],
-            [self.anchor[0], 1 + self.anchor[1], self.anchor[2]],
-            [1 + self.anchor[0], 1 + self.anchor[1], self.anchor[2]],
-            [self.anchor[0], self.anchor[1], 1 + self.anchor[2]],
-            [1 + self.anchor[0], self.anchor[1], 1 + self.anchor[2]],
-            [self.anchor[0], 1 + self.anchor[1], 1 + self.anchor[2]],
-            [1 + self.anchor[0], 1 + self.anchor[1], 1 + self.anchor[2]],
+            [step + self.anchor[0], self.anchor[1], self.anchor[2]],
+            [self.anchor[0], step + self.anchor[1], self.anchor[2]],
+            [step + self.anchor[0], step + self.anchor[1], self.anchor[2]],
+            [self.anchor[0], self.anchor[1], step + self.anchor[2]],
+            [step + self.anchor[0], self.anchor[1], step + self.anchor[2]],
+            [self.anchor[0], step + self.anchor[1], step + self.anchor[2]],
+            [step + self.anchor[0], step + self.anchor[1], step + self.anchor[2]],
         ];
 
         for anchor in anchors.iter() {
