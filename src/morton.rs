@@ -64,7 +64,8 @@ impl MortonKey {
         let morton = self.morton >> LEVEL_DISPLACEMENT;
 
         let parent_level = level - 1;
-        let parent_morton_without_level = (morton >> 3) << 3; // Zeros out the last 3 bits of the Morton index
+        let bit_multiplier = DEEPEST_LEVEL - parent_level;
+        let parent_morton_without_level = (morton >> 3 * bit_multiplier) << (3 * bit_multiplier); // Zeros out the last 3 * bit_multiplier bits of the Morton index
 
         let parent_morton = (parent_morton_without_level << LEVEL_DISPLACEMENT) | parent_level;
 
@@ -86,8 +87,9 @@ impl MortonKey {
 
         let mut children_morton: [KeyType; 8] = [0; 8];
         let mut children: Vec<MortonKey> = Vec::with_capacity(8);
+        let bit_shift = 3 * (DEEPEST_LEVEL - level - 1);
         for (index, item) in children_morton.iter_mut().enumerate() {
-            *item = ((morton | index as KeyType) << LEVEL_DISPLACEMENT) | (level + 1);
+            *item = ((morton | (index << bit_shift) as KeyType) << LEVEL_DISPLACEMENT) | (level + 1);
         }
 
         for &child_morton in children_morton.iter() {
@@ -138,7 +140,6 @@ impl MortonKey {
         let level = self.level();
         let step = (1 << (DEEPEST_LEVEL - level)) as u64;
 
-
         let anchors = [
             [self.anchor[0], self.anchor[1], self.anchor[2]],
             [step + self.anchor[0], self.anchor[1], self.anchor[2]],
@@ -147,7 +148,11 @@ impl MortonKey {
             [self.anchor[0], self.anchor[1], step + self.anchor[2]],
             [step + self.anchor[0], self.anchor[1], step + self.anchor[2]],
             [self.anchor[0], step + self.anchor[1], step + self.anchor[2]],
-            [step + self.anchor[0], step + self.anchor[1], step + self.anchor[2]],
+            [
+                step + self.anchor[0],
+                step + self.anchor[1],
+                step + self.anchor[2],
+            ],
         ];
 
         for anchor in anchors.iter() {

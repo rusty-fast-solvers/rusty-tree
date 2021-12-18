@@ -110,6 +110,23 @@ pub extern "C" fn morton_key_box_coordinates(
 }
 
 #[no_mangle]
+pub extern "C" fn morton_key_key_in_direction(
+    p_morton: *mut MortonKey,
+    p_direction: *const [i64; 3],
+) -> *mut MortonKey {
+    let direction = unsafe { p_direction.as_ref().unwrap() };
+
+    let shifted_key = unsafe { (*p_morton).find_key_in_direction(direction) };
+
+    match shifted_key {
+        Some(key) => 
+            get_raw(key),
+
+        None => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn morton_key_delete(p_morton_key: *mut MortonKey) {
     unsafe {
         drop(Box::from_raw(p_morton_key));

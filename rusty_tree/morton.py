@@ -114,6 +114,37 @@ class MortonKey(object):
         diameter = np.array(diameter, dtype=np.float64)
         diameter_data = ffi.from_buffer("double(*)[3]", diameter)
 
-        lib.morton_key_box_coordinates()
+        lib.morton_key_box_coordinates(self.ctype, origin_data, diameter_data, coords_data)
+
+        return coords
+
+    def find_key_in_direction(self, direction):
+        """
+        Find a key in a given direction.
+
+        Given an integer list `direction` containing
+        3 elements, return the key obtained by moving
+        from the current key `direction[j]` steps along
+        dimension [j]. For example, if `direction = [2, -1, 1]`
+        the method returns the key by moving two boxes in positive 
+        x-direction, one box in the negative y direction and one box
+        in the positive z direction. Boxes are counted with respect to
+        the current level.
+
+        If there is no box in the given direction, i.e. the new coordinates
+        are out of bounds, the method retunrs None.
+
+        """
+
+        direction = np.array(direction, dtype=np.int64)
+        direction_data = ffi.from_buffer("int64_t(*)[3]", direction)
+
+        ptr = lib.morton_key_key_in_direction(self.ctype, direction_data)
+
+        if ptr == ffi.NULL:
+            return None
+        else:
+            return MortonKey(ptr)
+
 
 
