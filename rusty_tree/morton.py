@@ -90,6 +90,17 @@ class MortonKey(object):
         """Return all children of the parent."""
         return self.parent().children()
 
+    def is_ancestor(self, other):
+        """Check if the key is ancestor of `other`."""
+
+        return lib.morton_key_is_ancestor(self.ctype, other.ctype)
+
+    def is_descendent(self, other):
+        """Check if the key is descendent of `other`."""
+
+        return lib.morton_key_is_descendent(self.ctype, other.ctype)
+
+
     def to_coordinates(self, origin, diameter):
         """Return the coordinates of the anchor."""
         coords = np.empty(3, dtype=np.float64)
@@ -104,7 +115,26 @@ class MortonKey(object):
         return coords
 
     def box_coordinates(self, origin, diameter):
-        """Return a serialized version of the box coordinates."""
+        """
+        Return the 8 coordinates of the box associated with the key.
+        
+        Let the unit cube be described as follows:
+
+        [
+            [0, 0, 0],
+            [1, 0, 0],
+            [0, 1, 0],
+            [1, 1, 0],
+            [0, 0, 1],
+            [1, 0, 1],
+            [0, 1, 1],
+            [1, 1, 1]
+         ]
+
+        The function returns the box coordinates in the same order
+        as the above unit cube coordinates.
+
+        """
         coords = np.empty(24, dtype=np.float64)
         coords_data = ffi.from_buffer("double(*)[24]", coords)
 
@@ -116,7 +146,7 @@ class MortonKey(object):
 
         lib.morton_key_box_coordinates(self.ctype, origin_data, diameter_data, coords_data)
 
-        return coords
+        return coords.reshape(8, 3)
 
     def find_key_in_direction(self, direction):
         """
@@ -146,5 +176,27 @@ class MortonKey(object):
         else:
             return MortonKey(ptr)
 
+    def __eq__(self, other):
+        """Implement == operator."""
+        return self.morton == other.morton
 
+    def __ne__(self, other):
+        """Implement != operator."""
+        return self.morton != other.morton
+
+    def __lt__(self, other):
+        """Implement < operator."""
+        return self.morton < other.morton
+
+    def __le__(self, other):
+        """Implement <= operator."""
+        return self.morton <= other.morton
+
+    def __gt__(self, other):
+        """Implement > operator."""
+        return self.morton > other.morton
+
+    def __ge__(self, other):
+        """Implement >= operator."""
+        return self.morton >= other.morton
 

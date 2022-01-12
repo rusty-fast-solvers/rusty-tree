@@ -104,6 +104,18 @@ impl MortonKey {
         self.parent().children()
     }
 
+    /// Check if the key is ancestor of `other`.
+    pub fn is_ancestor(&self, other: &MortonKey) -> bool {
+        let my_morton = self.morton() >> LEVEL_DISPLACEMENT;
+        let other_morton = other.morton() >> LEVEL_DISPLACEMENT;
+        (my_morton & other_morton == my_morton) & (self.level() < other.level())
+    }
+
+    /// Check if key is descendent of another key
+    pub fn is_descendent(&self, other: &MortonKey) -> bool {
+        other.is_ancestor(self)
+    }
+
     /// Return a point with the coordinates of the anchor
     pub fn to_coordinates(&self, domain: &Domain) -> [PointType; 3] {
         let mut coord: [PointType; 3] = [0.0; 3];

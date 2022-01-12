@@ -127,6 +127,23 @@ pub extern "C" fn morton_key_key_in_direction(
 }
 
 #[no_mangle]
+pub extern "C" fn morton_key_is_ancestor(
+    p_morton: *mut MortonKey,
+    p_other: *mut MortonKey,
+) -> bool {
+    unsafe { (*p_morton).is_ancestor(&*p_other)}
+}
+
+#[no_mangle]
+pub extern "C" fn morton_key_is_descendent(
+    p_morton: *mut MortonKey,
+    p_other: *mut MortonKey,
+) -> bool {
+    unsafe { (*p_morton).is_descendent(&*p_other)}
+}
+
+
+#[no_mangle]
 pub extern "C" fn morton_key_delete(p_morton_key: *mut MortonKey) {
     unsafe {
         drop(Box::from_raw(p_morton_key));
