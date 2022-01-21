@@ -3,6 +3,7 @@
 use itertools::izip;
 
 use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
 
 use crate::types::Domain;
 use crate::types::KeyType;
@@ -106,9 +107,14 @@ impl MortonKey {
 
     /// Check if the key is ancestor of `other`.
     pub fn is_ancestor(&self, other: &MortonKey) -> bool {
-        let my_morton = self.morton() >> LEVEL_DISPLACEMENT;
-        let other_morton = other.morton() >> LEVEL_DISPLACEMENT;
-        (my_morton & other_morton == my_morton) & (self.level() < other.level())
+
+        // If self is an ancester than the first bits of self and other have to agree.
+
+        // Shift out all bits associated with level displacement and descendent part.
+        let bitshift = 3 * (DEEPEST_LEVEL - self.level()) + (LEVEL_DISPLACEMENT as u64);
+        let my_shifted_morton = self.morton() >> bitshift;
+        let other_shifted_morton = other.morton() >> bitshift;
+        (my_shifted_morton == other_shifted_morton) & (self.level() < other.level())
     }
 
     /// Check if key is descendent of another key
@@ -266,6 +272,13 @@ impl PartialOrd for MortonKey {
         Some(self.cmp(&other))
     }
 }
+
+impl Hash for MortonKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.morton.hash(state);
+    }
+}
+
 
 /// Return the level associated with a key.
 fn find_level(morton: KeyType) -> KeyType {

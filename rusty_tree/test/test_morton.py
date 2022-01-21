@@ -131,3 +131,4 @@ def test_ancestor_descendent():
 
     assert parent.is_ancestor(key)
     assert key.is_descendent(parent)
+    assert key.is_ancestor(parent) is False

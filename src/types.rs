@@ -13,34 +13,14 @@ pub struct Point {
 
 pub struct Domain {
     pub origin: [PointType; 3],
-    pub diameter: [PointType; 3]
+    pub diameter: [PointType; 3],
 }
-
 
 /// Vector of **Points**.
 pub type Points = Vec<Point>;
 
 pub type KeyType = u64;
 
-pub struct Box {
-
-    /// Morton key of the Box
-    pub key: MortonKey,
-
-    /// Start and end index into the array of points,
-    /// sorted by Morton indices.
-    pub point_indices: (usize, usize)
-
-}
-
-impl Box {
-
-    /// Return the number of points in the box
-    pub fn number_of_points(&self) -> usize {
-        self.point_indices.1 - self.point_indices.0
-    }
-
-}
 
 // impl Default for Key {
 //     fn default() -> Self {
