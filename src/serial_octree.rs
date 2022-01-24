@@ -1,23 +1,28 @@
 //! Algorithms for serial Octrees
 
 use crate::morton::MortonKey;
-use crate::types::{Domain, KeyType, Point, Points};
+use crate::types::{Domain, Point, Points};
 use std::collections::{HashMap, HashSet};
 
 pub enum NodeType {
-    InteriorNode,
-    LeafNode((usize, usize)),
+    InteriorNode(HashSet<MortonKey>),
+    LeafNode,
+}
+
+pub struct NodeEntry {
+    node_type: NodeType,
+    points: HashSet<usize>,
 }
 
 pub struct Tree {
-    nodes: HashMap<MortonKey, NodeType>,
+    nodes: HashMap<MortonKey, NodeEntry>,
     points: Points,
     domain: Domain,
 }
 
 impl Tree {
     pub fn new(points: Points, domain: Domain) -> Self {
-        let mut nodes = HashMap::<MortonKey, NodeType>::new();
+        let nodes = HashMap::<MortonKey, NodeEntry>::new();
 
         // First sort the points
         let (sorted_points, sorted_keys) = points_to_sorted_morton_keys(&points, &domain);
@@ -31,23 +36,58 @@ impl Tree {
         // Insert the keys and their ancestors into the tree
 
         for (index, &key) in sorted_keys.iter().enumerate() {
-
             let mut current_key = key.clone();
-            tree.nodes.insert(key, NodeType::LeafNode((index, index + 1)));
+            tree.nodes.insert(
+                key,
+                NodeEntry {
+                    node_type: NodeType::LeafNode,
+                    points: HashSet::from([index]),
+                },
+            );
 
             while current_key.level() > 0 {
+                let child_key = current_key.clone();
                 current_key = current_key.parent();
-                if tree.nodes.contains_key(&current_key) {
-                    break;
-                }
-                else {
-                    // Insert the key
-                    tree.nodes.insert(current_key, NodeType::InteriorNode);
+                if let Some(entry) = tree.nodes.get_mut(&current_key) {
+                    if let NodeType::InteriorNode(children) = &mut entry.node_type {
+                        children.insert(child_key);
+                        entry.points.insert(index);
+                    }
+                } else {
+                    tree.nodes.insert(
+                        key,
+                        NodeEntry {
+                            node_type: NodeType::InteriorNode(HashSet::from([child_key])),
+                            points: HashSet::from([index]),
+                        },
+                    );
                 }
             }
         }
 
         tree
+    }
+
+    pub fn remove_node(&mut self, key: &MortonKey) -> Result<(), ()> {
+        if let Some(node_entry) = self.nodes.remove(key) {
+            if let NodeType::InteriorNode(children) = &node_entry.node_type {
+                for child in children {
+                    self.remove_node(&child).unwrap();
+                }
+                if let Some(mut parent_entry) = self.nodes.get_mut(&key.parent()) {
+                    if let NodeType::InteriorNode(children) = &mut parent_entry.node_type {
+                        children.remove(key);
+                        if children.len() == 0 {
+                            parent_entry.node_type = NodeType::LeafNode;
+                        }
+                    }
+                }
+            }
+
+            Ok(())
+        } else {
+            Err(())
+        }
     }
 }
 
