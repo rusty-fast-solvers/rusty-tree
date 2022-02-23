@@ -3,14 +3,15 @@
 use itertools::izip;
 
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 
 use crate::types::Domain;
 use crate::types::KeyType;
 use crate::types::PointType;
 
-const DEEPEST_LEVEL: KeyType = 16;
-const LEVEL_SIZE: KeyType = 1 << DEEPEST_LEVEL;
+pub const DEEPEST_LEVEL: KeyType = 16;
+pub const LEVEL_SIZE: KeyType = 1 << DEEPEST_LEVEL;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -65,8 +66,8 @@ impl MortonKey {
         let morton = self.morton >> LEVEL_DISPLACEMENT;
 
         let parent_level = level - 1;
-        let bit_multiplier = DEEPEST_LEVEL - parent_level;
         let parent_morton_without_level = (morton >> 3 * bit_multiplier) << (3 * bit_multiplier); // Zeros out the last 3 * bit_multiplier bits of the Morton index
+        let bit_multiplier = DEEPEST_LEVEL - parent_level;
 
         let parent_morton = (parent_morton_without_level << LEVEL_DISPLACEMENT) | parent_level;
 
@@ -81,6 +82,23 @@ impl MortonKey {
         }
     }
 
+    /// Return the first child on the deepest level
+    pub fn finest_first_child(&self) -> Self {
+        MortonKey {
+            anchor: self.anchor,
+            morton: DEEPEST_LEVEL - self.level() + self.morton,
+        }
+    }
+
+    /// Return the last child on the deepest level
+    pub fn finest_last_child(&self) -> Self {
+        let morton = self.morton >> LEVEL_DISPLACEMENT;
+        let nlevels = DEEPEST_LEVEL - self.level();
+        let mask: KeyType = (1 << 3 * nlevels) - 1;
+        let morton = morton | mask;
+        MortonKey::from_morton(morton + DEEPEST_LEVEL)
+    }
+
     /// Return all children in order of their Morton indices
     pub fn children(&self) -> Vec<MortonKey> {
         let level = self.level();
@@ -90,7 +108,8 @@ impl MortonKey {
         let mut children: Vec<MortonKey> = Vec::with_capacity(8);
         let bit_shift = 3 * (DEEPEST_LEVEL - level - 1);
         for (index, item) in children_morton.iter_mut().enumerate() {
-            *item = ((morton | (index << bit_shift) as KeyType) << LEVEL_DISPLACEMENT) | (level + 1);
+            *item =
+                ((morton | (index << bit_shift) as KeyType) << LEVEL_DISPLACEMENT) | (level + 1);
         }
 
         for &child_morton in children_morton.iter() {
@@ -107,19 +126,42 @@ impl MortonKey {
 
     /// Check if the key is ancestor of `other`.
     pub fn is_ancestor(&self, other: &MortonKey) -> bool {
+        let ancestors = other.ancestors();
 
-        // If self is an ancester than the first bits of self and other have to agree.
-
-        // Shift out all bits associated with level displacement and descendent part.
-        let bitshift = 3 * (DEEPEST_LEVEL - self.level()) + (LEVEL_DISPLACEMENT as u64);
-        let my_shifted_morton = self.morton() >> bitshift;
-        let other_shifted_morton = other.morton() >> bitshift;
-        (my_shifted_morton == other_shifted_morton) & (self.level() < other.level())
+        ancestors.contains(self)
     }
 
     /// Check if key is descendent of another key
     pub fn is_descendent(&self, other: &MortonKey) -> bool {
         other.is_ancestor(self)
+    }
+
+    /// Return set of all ancestors
+    pub fn ancestors(&self) -> HashSet<MortonKey> {
+        let mut ancestors = HashSet::<MortonKey>::new();
+
+        let mut current = self.clone();
+
+        while current.level() > 0 {
+            current = current.parent();
+            ancestors.insert(current);
+        }
+
+        ancestors
+    }
+
+    /// Find the finest ancestor of key and another key
+    pub fn finest_ancestor(&self, other: &MortonKey) -> MortonKey {
+        if self == other {
+            return other.clone();
+        } else {
+            let my_ancestors = self.ancestors();
+            let mut current = other.parent();
+            while !my_ancestors.contains(&current) {
+                current = current.parent()
+            }
+            current
+        }
     }
 
     /// Return a point with the coordinates of the anchor
@@ -278,7 +320,6 @@ impl Hash for MortonKey {
         self.morton.hash(state);
     }
 }
-
 
 /// Return the level associated with a key.
 fn find_level(morton: KeyType) -> KeyType {
