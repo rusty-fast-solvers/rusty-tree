@@ -1,18 +1,18 @@
 // C-API for the Morton Key Type
 
-use crate::morton::MortonKey;
+use crate::types::Key;
 use crate::types::{Domain, KeyType, PointType};
 
 #[no_mangle]
-pub extern "C" fn morton_key_from_anchor(p_anchor: *const [KeyType; 3]) -> *mut MortonKey {
+pub extern "C" fn morton_key_from_anchor(p_anchor: *const [KeyType; 3]) -> *mut Key {
     let anchor: &[KeyType; 3] = unsafe { p_anchor.as_ref().unwrap() };
 
-    get_raw(MortonKey::from_anchor(anchor))
+    get_raw(Key::from_anchor(anchor))
 }
 
 #[no_mangle]
-pub extern "C" fn morton_key_from_morton(morton: KeyType) -> *mut MortonKey {
-    get_raw(MortonKey::from_morton(morton))
+pub extern "C" fn morton_key_from_morton(morton: KeyType) -> *mut Key {
+    get_raw(Key::from_morton(morton))
 }
 
 #[no_mangle]
@@ -20,7 +20,7 @@ pub extern "C" fn morton_key_from_point(
     p_point: *const [PointType; 3],
     p_origin: *const [PointType; 3],
     p_diameter: *const [PointType; 3],
-) -> *mut MortonKey {
+) -> *mut Key {
     let point: &[PointType; 3] = unsafe { p_point.as_ref().unwrap() };
     let origin: &[PointType; 3] = unsafe { p_origin.as_ref().unwrap() };
     let diameter: &[PointType; 3] = unsafe { p_diameter.as_ref().unwrap() };
@@ -30,28 +30,28 @@ pub extern "C" fn morton_key_from_point(
         diameter: diameter.to_owned(),
     };
 
-    get_raw(MortonKey::from_point(point, &domain))
+    get_raw(Key::from_point(point, &domain))
 }
 
 #[no_mangle]
-pub extern "C" fn morton_key_parent(p_morton: *mut MortonKey) -> *mut MortonKey {
+pub extern "C" fn morton_key_parent(p_morton: *mut Key) -> *mut Key {
     let parent = unsafe { (*p_morton).parent() };
     get_raw(parent)
 }
 
 #[no_mangle]
-pub extern "C" fn morton_key_level(p_morton: *mut MortonKey) -> KeyType {
+pub extern "C" fn morton_key_level(p_morton: *mut Key) -> KeyType {
     unsafe { (*p_morton).level() }
 }
 
 #[no_mangle]
-pub extern "C" fn morton_key_first_child(p_morton: *mut MortonKey) -> *mut MortonKey {
+pub extern "C" fn morton_key_first_child(p_morton: *mut Key) -> *mut Key {
     let first_child = unsafe { (*p_morton).first_child() };
     get_raw(first_child)
 }
 
 #[no_mangle]
-pub extern "C" fn morton_key_children(p_morton: *mut MortonKey, ptr: *mut usize) {
+pub extern "C" fn morton_key_children(p_morton: *mut Key, ptr: *mut usize) {
     let mut children_vec = unsafe { (*p_morton).children() };
 
     let children_boxes = unsafe { std::slice::from_raw_parts_mut(ptr, 8) };
@@ -63,7 +63,7 @@ pub extern "C" fn morton_key_children(p_morton: *mut MortonKey, ptr: *mut usize)
 
 #[no_mangle]
 pub extern "C" fn morton_key_to_coordinates(
-    p_morton: *mut MortonKey,
+    p_morton: *mut Key,
     p_origin: *const [PointType; 3],
     p_diameter: *const [PointType; 3],
     p_coord: *mut [PointType; 3],
@@ -87,7 +87,7 @@ pub extern "C" fn morton_key_to_coordinates(
 
 #[no_mangle]
 pub extern "C" fn morton_key_box_coordinates(
-    p_morton: *mut MortonKey,
+    p_morton: *mut Key,
     p_origin: *const [PointType; 3],
     p_diameter: *const [PointType; 3],
     box_coord: *mut [PointType; 24],
@@ -111,15 +111,15 @@ pub extern "C" fn morton_key_box_coordinates(
 
 #[no_mangle]
 pub extern "C" fn morton_key_key_in_direction(
-    p_morton: *mut MortonKey,
+    p_morton: *mut Key,
     p_direction: *const [i64; 3],
-) -> *mut MortonKey {
+) -> *mut Key {
     let direction = unsafe { p_direction.as_ref().unwrap() };
 
     let shifted_key = unsafe { (*p_morton).find_key_in_direction(direction) };
 
     match shifted_key {
-        Some(key) => 
+        Some(key) =>
             get_raw(key),
 
         None => std::ptr::null_mut(),
@@ -128,29 +128,29 @@ pub extern "C" fn morton_key_key_in_direction(
 
 #[no_mangle]
 pub extern "C" fn morton_key_is_ancestor(
-    p_morton: *mut MortonKey,
-    p_other: *mut MortonKey,
+    p_morton: *mut Key,
+    p_other: *mut Key,
 ) -> bool {
     unsafe { (*p_morton).is_ancestor(&*p_other)}
 }
 
 #[no_mangle]
 pub extern "C" fn morton_key_is_descendent(
-    p_morton: *mut MortonKey,
-    p_other: *mut MortonKey,
+    p_morton: *mut Key,
+    p_other: *mut Key,
 ) -> bool {
     unsafe { (*p_morton).is_descendent(&*p_other)}
 }
 
 
 #[no_mangle]
-pub extern "C" fn morton_key_delete(p_morton_key: *mut MortonKey) {
+pub extern "C" fn morton_key_delete(p_morton_key: *mut Key) {
     unsafe {
         drop(Box::from_raw(p_morton_key));
     }
 }
 
 /// Return a raw pointer for an object
-fn get_raw(key: MortonKey) -> *mut MortonKey {
+fn get_raw(key: Key) -> *mut Key {
     Box::into_raw(Box::new(key))
 }

@@ -1,8 +1,7 @@
-//! C API for serial trees
+//! C API for single node trees
 
-use crate::types::KeyType;
-use crate::morton::MortonKey;
-use crate::serial_octree::{Tree, LinearTree};
+use crate::types::{Key, KeyType};
+use crate::octree::{Tree, LinearTree};
 use std::slice::from_raw_parts;
 
 
@@ -10,7 +9,7 @@ use std::slice::from_raw_parts;
 pub extern "C" fn tree_from_morton_keys(data: *const KeyType, len: usize) -> *mut Tree {
 
     let slice = unsafe {from_raw_parts(data, len) };
-    let iter = slice.iter().map(|&item| MortonKey::from_morton(item));
+    let iter = slice.iter().map(|&item| Key::from_morton(item));
     let tree = Tree::from_iterable(iter);
 
     Box::into_raw(Box::new(tree))

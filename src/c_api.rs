@@ -2,6 +2,7 @@
 
 pub mod morton;
 pub mod helpers;
-pub mod serial_tree;
+pub mod octree;
+pub mod distributed;
 
 
