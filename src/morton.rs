@@ -66,8 +66,8 @@ impl MortonKey {
         let morton = self.morton >> LEVEL_DISPLACEMENT;
 
         let parent_level = level - 1;
-        let parent_morton_without_level = (morton >> 3 * bit_multiplier) << (3 * bit_multiplier); // Zeros out the last 3 * bit_multiplier bits of the Morton index
         let bit_multiplier = DEEPEST_LEVEL - parent_level;
+        let parent_morton_without_level = (morton >> 3 * bit_multiplier) << (3 * bit_multiplier); // Zeros out the last 3 * bit_multiplier bits of the Morton index
 
         let parent_morton = (parent_morton_without_level << LEVEL_DISPLACEMENT) | parent_level;
 

@@ -16,22 +16,22 @@ name = "rusty_tree"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-rusty-kernel-tools = "0.1"
-rusty-base = { version = "0.1", path = "../rusty-base"}
-num = "0.3"
-ndarray = { version = "0.*", features = ["rayon"] }
-rand = "0.8"
+#rusty-kernel-tools = "0.1"
+#rusty-base = { version = "0.1", path = "../rusty-base"}
+#num = "0.3"
+#ndarray = { version = "0.*", features = ["rayon"] }
+#rand = "0.8"
 itertools = "0.10"
-rayon = "1.5"
-vtkio = "0.6"
+#rayon = "1.5"
+#vtkio = "0.6"
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }
 
-[[bench]]
-name = "regular_octree_benchmarks"
-harness = false
+#[[bench]]
+#name = "regular_octree_benchmarks"
+#harness = false
 
-[[bench]]
-name = "adaptive_octree_benchmarks"
-harness = false
+#[[bench]]
+#name = "adaptive_octree_benchmarks"
+#harness = false

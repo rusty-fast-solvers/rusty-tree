@@ -1,7 +1,5 @@
 //! Definition of basic types
 
-use crate::morton::MortonKey;
-
 pub type PointType = f64;
 
 #[derive(Clone, Copy, Debug)]

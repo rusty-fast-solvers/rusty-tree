@@ -1,20 +1,15 @@
 //! Algorithms for serial Octrees
 
 use crate::morton::MortonKey;
-use crate::types::{Domain, KeyType, Point, Points};
+// use crate::types::{Domain, KeyType, Point, Points};
 use crate::DEEPEST_LEVEL;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
-use std::iter::FromIterator;
+// use std::iter::FromIterator;
 
 pub enum NodeType {
     InteriorNode(HashSet<MortonKey>),
     LeafNode,
-}
-
-pub struct NodeEntry {
-    node_type: NodeType,
-    points: HashSet<usize>,
 }
 
 pub struct Tree {
@@ -43,10 +38,10 @@ impl Tree {
         Tree { keys }
     }
 
-    pub fn linearize(self) -> LinearTree {
+    pub fn linearize(&self) -> LinearTree {
         // To linearize the tree we first sort it.
 
-        let mut keys: Vec<MortonKey> = self.keys.into_iter().collect::<Vec<MortonKey>>();
+        let mut keys: Vec<MortonKey> = self.keys.iter().copied().collect::<Vec<MortonKey>>();
         keys.sort();
 
         // Then we remove the ancestors.
@@ -67,10 +62,10 @@ impl Tree {
 }
 
 impl LinearTree {
-    pub fn complete(mut self, root: MortonKey) -> CompleteLinearTree {
+    pub fn complete(&mut self, root: MortonKey) -> CompleteLinearTree {
         fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
-            let region = Vec::<MortonKey>::new();
-            let work_set = a.finest_ancestor(&b).children();
+            let mut region = Vec::<MortonKey>::new();
+            let mut work_set = a.finest_ancestor(&b).children();
 
             let a_ancestors = a.ancestors();
             let b_ancestors = b.ancestors();
@@ -80,8 +75,8 @@ impl LinearTree {
                 if (current_item > *a) & (current_item < *b) & !b_ancestors.contains(&current_item)
                 {
                     region.push(current_item);
-                } else if (a.ancestors().contains(&current_item))
-                    | (b.ancestors().contains(&current_item))
+                } else if (a_ancestors.contains(&current_item))
+                    | (b_ancestors.contains(&current_item))
                 {
                     let mut children = current_item.children();
                     work_set.append(&mut children);
@@ -111,7 +106,7 @@ impl LinearTree {
         let mut new_keys = Vec::<MortonKey>::new();
 
         for (first, second) in self.keys.iter().tuple_windows::<(_, _)>() {
-            let mut region = complete_region(first, second);
+            let region = complete_region(first, second);
             new_keys.push(first.clone());
             new_keys.extend(region.iter());
             new_keys.push(second.clone());
@@ -123,7 +118,7 @@ impl LinearTree {
 
 impl CompleteLinearTree {
     pub fn compute_interior_weights(
-        self,
+        &self,
         root: &MortonKey,
         weights: &Vec<f64>,
     ) -> HashMap<MortonKey, f64> {
@@ -138,19 +133,19 @@ impl CompleteLinearTree {
             "`root` is not ancestor of the keys."
         );
 
-        let weights_map = HashMap::<MortonKey, f64>::new();
+        let mut weights_map = HashMap::<MortonKey, f64>::new();
 
         // Traverse tree bottom up to compute all weights
 
-        for (mut key, mut weight) in self.keys.iter().copied().zip(weights.iter().copied()) {
+        for (key, mut weight) in self.keys.iter().copied().zip(weights.iter().copied()) {
             weights_map.insert(key, weight);
 
             while key != *root {
                 let parent = key.parent();
 
-                if let Some(&mut parent_weight) = weights_map.get_mut(&parent) {
-                    weight += parent_weight;
-                    parent_weight = weight;
+                if let Some(parent_weight) = weights_map.get_mut(&parent) {
+                    *parent_weight += weight;
+                    weight = *parent_weight;
                 } else {
                     weights_map.insert(parent, weight);
                 }
@@ -161,7 +156,7 @@ impl CompleteLinearTree {
     }
 
     pub fn coarsen_by_weights(
-        self,
+        &self,
         root: &MortonKey,
         weights: &Vec<f64>,
         max_weight: f64,
@@ -193,7 +188,7 @@ impl CompleteLinearTree {
         }
 
         let weights_map = self.compute_interior_weights(&root, &weights);
-        let result_keys = Vec::<MortonKey>::with_capacity(self.keys.len());
+        let mut result_keys = Vec::<MortonKey>::with_capacity(self.keys.len());
         coarsen_impl(root, &weights_map, &mut result_keys, max_weight);
         result_keys.sort();
 
