@@ -24,6 +24,10 @@ crate-type = ["lib", "cdylib"]
 itertools = "0.10"
 #rayon = "1.5"
 #vtkio = "0.6"
+mpi = { git = "https://github.com/rsmpi/rsmpi", branch = "main"}
+memoffset = "0.6"
+rand = "0.8.4"
+hyksort = {git = "https://github.com/skailasa/hyksort", branch = "main"}
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }

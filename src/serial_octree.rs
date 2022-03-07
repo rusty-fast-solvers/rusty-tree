@@ -5,38 +5,72 @@ use crate::morton::MortonKey;
 use crate::DEEPEST_LEVEL;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
-// use std::iter::FromIterator;
+use std::iter::FromIterator;
 
 pub enum NodeType {
     InteriorNode(HashSet<MortonKey>),
     LeafNode,
 }
 
+#[derive(Debug)]
 pub struct Tree {
-    keys: HashSet<MortonKey>,
+    pub keys: HashSet<MortonKey>,
 }
 
+#[derive(Debug)]
 pub struct LinearTree {
-    keys: Vec<MortonKey>,
+    pub keys: Vec<MortonKey>,
 }
 
+#[derive(Debug)]
 pub struct CompleteLinearTree {
-    keys: Vec<MortonKey>,
+    pub keys: Vec<MortonKey>,
 }
 
 impl Tree {
     pub fn from_iterable<T: Iterator<Item = MortonKey>>(keys: T) -> Tree {
+
         let mut key_set = HashSet::<MortonKey>::new();
+
         for item in keys {
-            key_set.insert(item);
+            key_set.insert(item.clone());
         }
 
         Tree { keys: key_set }
     }
 
-    pub fn from_hash_set(keys: HashSet<MortonKey>) -> Tree {
-        Tree { keys }
+    pub fn linearize_keys(mut keys: Vec<MortonKey>) -> Vec<MortonKey> {
+
+        // To linearize the tree we first sort it.
+        keys.sort();
+
+        let nkeys = keys.len();
+
+        // Then we remove the ancestors.
+        let mut new_keys = Vec::<MortonKey>::with_capacity(keys.len());
+
+        // Now check pairwise for ancestor relationship and only add to new vector if item
+        // is not an ancestor of the next item. Add final element.
+        keys.into_iter().enumerate().tuple_windows::<((_, _), (_, _))>().for_each(|((_, a), (j, b))| {
+            if !a.is_ancestor(&b) {
+                new_keys.push(a.clone());
+            }
+            if j == (nkeys -1) {
+                new_keys.push(b.clone());
+            }
+        });
+
+        new_keys
     }
+
+    pub fn linearize(&self) -> LinearTree {
+        let keys: Vec<MortonKey> = self.keys.iter().copied().collect::<Vec<MortonKey>>();
+
+        LinearTree { keys: Tree::linearize_keys(keys) }
+    }
+}
+
+impl LinearTree {
 
     pub fn linearize(&self) -> LinearTree {
         // To linearize the tree we first sort it.
@@ -44,76 +78,87 @@ impl Tree {
         let mut keys: Vec<MortonKey> = self.keys.iter().copied().collect::<Vec<MortonKey>>();
         keys.sort();
 
-        // Then we remove the ancestors.
+        let nkeys = self.keys.len();
 
-        let mut new_keys = Vec::<MortonKey>::with_capacity(keys.len());
+        // Then we remove the ancestors.
+        let mut new_keys = Vec::<MortonKey>::with_capacity(self.keys.len());
 
         // Now check pairwise for ancestor relationship and only add to new vector if item
-        // is not an ancestor of the next item.
-
-        keys.into_iter().tuple_windows::<(_, _)>().for_each(|item| {
-            if !item.0.is_ancestor(&item.1) {
-                new_keys.push(item.0);
+        // is not an ancestor of the next item. Add final element.
+        keys.into_iter().enumerate().tuple_windows::<((_, _), (_, _))>().for_each(|((_, a), (j, b))| {
+            if !a.is_ancestor(&b) {
+                new_keys.push(a.clone());
+            }
+            if j == (nkeys -1) {
+                new_keys.push(b.clone());
             }
         });
 
         LinearTree { keys: new_keys }
     }
-}
 
-impl LinearTree {
-    pub fn complete(&mut self, root: MortonKey) -> CompleteLinearTree {
-        fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
-            let mut region = Vec::<MortonKey>::new();
-            let mut work_set = a.finest_ancestor(&b).children();
+    pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
+        let mut region = Vec::<MortonKey>::new();
+        let mut work_set = a.finest_ancestor(&b).children();
 
-            let a_ancestors = a.ancestors();
-            let b_ancestors = b.ancestors();
+        let a_ancestors = a.ancestors();
+        let b_ancestors = b.ancestors();
 
-            while work_set.len() > 0 {
-                let current_item = work_set.pop().unwrap();
-                if (current_item > *a) & (current_item < *b) & !b_ancestors.contains(&current_item)
-                {
-                    region.push(current_item);
-                } else if (a_ancestors.contains(&current_item))
-                    | (b_ancestors.contains(&current_item))
-                {
-                    let mut children = current_item.children();
-                    work_set.append(&mut children);
-                }
+        while work_set.len() > 0 {
+            let current_item = work_set.pop().unwrap();
+            if (current_item > *a) & (current_item < *b) & !b_ancestors.contains(&current_item)
+            {
+                region.push(current_item);
+            } else if (a_ancestors.contains(&current_item))
+                | (b_ancestors.contains(&current_item))
+            {
+                let mut children = current_item.children();
+                work_set.append(&mut children);
             }
-
-            region.sort();
-            region
         }
 
-        assert!(
-            root.is_ancestor(self.keys.first().unwrap())
-                && root.is_ancestor(self.keys.last().unwrap()),
-            "`root` is not ancestor of the keys."
-        );
-
-        let finest_first_child = root.finest_first_child();
-        let finest_last_child = root.finest_last_child();
-
-        if *self.keys.first().unwrap() != finest_first_child {
-            self.keys.insert(0, finest_first_child);
-        }
-        if *self.keys.last().unwrap() != finest_last_child {
-            self.keys.push(finest_last_child);
-        }
-
-        let mut new_keys = Vec::<MortonKey>::new();
-
-        for (first, second) in self.keys.iter().tuple_windows::<(_, _)>() {
-            let region = complete_region(first, second);
-            new_keys.push(first.clone());
-            new_keys.extend(region.iter());
-            new_keys.push(second.clone());
-        }
-
-        CompleteLinearTree { keys: new_keys }
+        region.sort();
+        region.push(a.clone());
+        region.push(b.clone());
+        region
+        // Tree::linearize_keys(region)
     }
+
+    pub fn complete(&self) -> CompleteLinearTree {
+        let a = self.keys.iter().min().unwrap();
+        let b = self.keys.iter().max().unwrap();
+        CompleteLinearTree{keys: LinearTree::complete_region(&a, &b)}
+    }
+
+    // pub fn complete(&mut self, root: MortonKey) -> CompleteLinearTree {
+
+    //     assert!(
+    //         root.is_ancestor(self.keys.first().unwrap())
+    //             && root.is_ancestor(self.keys.last().unwrap()),
+    //         "`root` is not ancestor of the keys."
+    //     );
+
+    //     let finest_first_child = root.finest_first_child();
+    //     let finest_last_child = root.finest_last_child();
+
+    //     if *self.keys.first().unwrap() != finest_first_child {
+    //         self.keys.insert(0, finest_first_child);
+    //     }
+    //     if *self.keys.last().unwrap() != finest_last_child {
+    //         self.keys.push(finest_last_child);
+    //     }
+
+    //     let mut new_keys = Vec::<MortonKey>::new();
+
+    //     for (first, second) in self.keys.iter().tuple_windows::<(_, _)>() {
+    //         let region = LinearTree::complete_region(first, second);
+    //         new_keys.push(first.clone());
+    //         new_keys.extend(region.iter());
+    //         new_keys.push(second.clone());
+    //     }
+
+    //     CompleteLinearTree { keys: new_keys }
+    // }
 }
 
 impl CompleteLinearTree {

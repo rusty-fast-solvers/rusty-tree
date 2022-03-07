@@ -6,12 +6,21 @@ use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 
+use memoffset::offset_of;
+use mpi::{
+    Address,
+    datatype::{
+        Equivalence, UncommittedUserDatatype, UserDatatype
+    }
+};
+
 use crate::types::Domain;
 use crate::types::KeyType;
 use crate::types::PointType;
 
 pub const DEEPEST_LEVEL: KeyType = 16;
 pub const LEVEL_SIZE: KeyType = 1 << DEEPEST_LEVEL;
+pub const ROOT: MortonKey = MortonKey{anchor: [0, 0, 0], morton: 0};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -19,6 +28,33 @@ pub const LEVEL_SIZE: KeyType = 1 << DEEPEST_LEVEL;
 pub struct MortonKey {
     anchor: [KeyType; 3],
     morton: KeyType,
+}
+
+
+unsafe impl Equivalence for MortonKey {
+    type Out = UserDatatype;
+    fn equivalent_datatype() -> Self::Out {
+        UserDatatype::structured(
+            &[1, 1],
+            &[
+                offset_of!(MortonKey, anchor) as Address,
+                offset_of!(MortonKey, morton) as Address
+            ],
+            &[
+                UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype()).as_ref(),
+                UncommittedUserDatatype::contiguous(1, &KeyType::equivalent_datatype()).as_ref(),
+            ]
+        )
+    }
+}
+
+impl Default for MortonKey {
+    fn default() -> Self {
+        MortonKey {
+            anchor: [KeyType::default(), KeyType::default(), KeyType::default()],
+            morton: KeyType::default()
+        }
+    }
 }
 
 impl MortonKey {
