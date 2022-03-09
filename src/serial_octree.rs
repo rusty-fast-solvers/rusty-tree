@@ -116,49 +116,18 @@ impl LinearTree {
                 work_set.append(&mut children);
             }
         }
-
         region.sort();
-        region.push(a.clone());
-        region.push(b.clone());
-        region
-        // Tree::linearize_keys(region)
+        Tree::linearize_keys(region)
     }
 
     pub fn complete(&self) -> CompleteLinearTree {
         let a = self.keys.iter().min().unwrap();
         let b = self.keys.iter().max().unwrap();
-        CompleteLinearTree{keys: LinearTree::complete_region(&a, &b)}
+        let mut completion = LinearTree::complete_region(&a, &b);
+        completion.push(a.clone());
+        completion.push(b.clone());
+        CompleteLinearTree{keys: completion}
     }
-
-    // pub fn complete(&mut self, root: MortonKey) -> CompleteLinearTree {
-
-    //     assert!(
-    //         root.is_ancestor(self.keys.first().unwrap())
-    //             && root.is_ancestor(self.keys.last().unwrap()),
-    //         "`root` is not ancestor of the keys."
-    //     );
-
-    //     let finest_first_child = root.finest_first_child();
-    //     let finest_last_child = root.finest_last_child();
-
-    //     if *self.keys.first().unwrap() != finest_first_child {
-    //         self.keys.insert(0, finest_first_child);
-    //     }
-    //     if *self.keys.last().unwrap() != finest_last_child {
-    //         self.keys.push(finest_last_child);
-    //     }
-
-    //     let mut new_keys = Vec::<MortonKey>::new();
-
-    //     for (first, second) in self.keys.iter().tuple_windows::<(_, _)>() {
-    //         let region = LinearTree::complete_region(first, second);
-    //         new_keys.push(first.clone());
-    //         new_keys.extend(region.iter());
-    //         new_keys.push(second.clone());
-    //     }
-
-    //     CompleteLinearTree { keys: new_keys }
-    // }
 }
 
 impl CompleteLinearTree {

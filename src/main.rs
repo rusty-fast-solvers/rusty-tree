@@ -20,7 +20,7 @@ fn main() {
     // 0. Experimental Parameters
     let depth: u64 = 5;
     let ncrit: u64 = 150;
-    let npoints: u64 = 10000;
+    let npoints: u64 = 100;
     let k: Rank = 2;
 
     let domain = Domain{
