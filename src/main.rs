@@ -1,4 +1,5 @@
-use rand::Rng;
+use rand::prelude::*;
+use rand::{Rng, SeedableRng, distributions::Uniform};
 use mpi::traits::*;
 use mpi::topology::{Color, Rank};
 
@@ -19,8 +20,8 @@ fn main() {
 
     // 0. Experimental Parameters
     let depth: u64 = 5;
-    let ncrit: u64 = 150;
-    let npoints: u64 = 100;
+    let ncrit: usize = 150;
+    let npoints: u64 = 10000;
     let k: Rank = 2;
 
     let domain = Domain{
@@ -28,11 +29,13 @@ fn main() {
         diameter: [1., 1., 1.]
     };
 
-    let mut range = rand::thread_rng();
+    // let mut range: Rng = SeedableRng::from_seed(0);
+    let mut range = StdRng::seed_from_u64(0);
+    let between = rand::distributions::Uniform::from(0.0..1.0);
     let mut points = Vec::new();
 
     for _ in 0..npoints {
-        points.push([range.gen(), range.gen(), range.gen()]);
+        points.push([between.sample(&mut range), between.sample(&mut range), between.sample(&mut range)])
     }
 
     // let keys: Vec<MortonKey> = points
@@ -43,7 +46,7 @@ fn main() {
     // println!("keys {:?}", keys);
 
     let tree = unbalanced_tree(
-        &depth, &ncrit, &size, &rank, &universe, points, &domain, k
+        &ncrit, &size, &rank, &universe, points, &domain, k
     );
 
 }

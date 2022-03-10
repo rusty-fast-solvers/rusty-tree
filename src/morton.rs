@@ -20,7 +20,7 @@ use crate::types::KeyType;
 use crate::types::PointType;
 
 // #[from_env("DEEPEST_LEVEL")]
-pub const DEEPEST_LEVEL: KeyType = 2;
+pub const DEEPEST_LEVEL: KeyType = 16;
 pub const LEVEL_SIZE: KeyType = 1 << DEEPEST_LEVEL;
 pub const ROOT: MortonKey = MortonKey{anchor: [0, 0, 0], morton: 0};
 
@@ -406,25 +406,6 @@ impl Ord for Point {
     }
 }
 
-fn less_than(a: &MortonKey, b: &MortonKey) -> Option<Ordering> {
-
-    let same_anchor =
-        (a.morton >> LEVEL_DISPLACEMENT) == (b.morton >> LEVEL_DISPLACEMENT);
-
-    match same_anchor {
-        true => {
-            if a.level() < b.level() {
-                Some(Ordering::Less)
-            } else {
-                Some(Ordering::Greater)
-            }
-        }
-        false => {
-            Some(a.morton.cmp(&b.morton))
-        }
-    }
-}
-
 
 impl PartialOrd for MortonKey {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -522,20 +503,20 @@ fn encode_anchor(anchor: &[KeyType; 3], level: KeyType) -> KeyType {
     let y = anchor[1];
     let z = anchor[2];
 
-    let key: KeyType = Z_LOOKUP_ENCODE[((z >> BYTE_DISPLACEMENT) & BYTE_MASK) as usize]
+    let key: KeyType = X_LOOKUP_ENCODE[((x >> BYTE_DISPLACEMENT) & BYTE_MASK) as usize]
         | Y_LOOKUP_ENCODE[((y >> BYTE_DISPLACEMENT) & BYTE_MASK) as usize]
-        | X_LOOKUP_ENCODE[((x >> BYTE_DISPLACEMENT) & BYTE_MASK) as usize];
+        | Z_LOOKUP_ENCODE[((z >> BYTE_DISPLACEMENT) & BYTE_MASK) as usize];
 
     let key = (key << 24)
-        | Z_LOOKUP_ENCODE[(z & BYTE_MASK) as usize]
+        | X_LOOKUP_ENCODE[(x & BYTE_MASK) as usize]
         | Y_LOOKUP_ENCODE[(y & BYTE_MASK) as usize]
-        | X_LOOKUP_ENCODE[(x & BYTE_MASK) as usize];
+        | Z_LOOKUP_ENCODE[(z & BYTE_MASK) as usize];
 
     let key = key << LEVEL_DISPLACEMENT;
     key | level
 }
 
-const X_LOOKUP_ENCODE: [KeyType; 256] = [
+const Z_LOOKUP_ENCODE: [KeyType; 256] = [
     0x00000000, 0x00000001, 0x00000008, 0x00000009, 0x00000040, 0x00000041, 0x00000048, 0x00000049,
     0x00000200, 0x00000201, 0x00000208, 0x00000209, 0x00000240, 0x00000241, 0x00000248, 0x00000249,
     0x00001000, 0x00001001, 0x00001008, 0x00001009, 0x00001040, 0x00001041, 0x00001048, 0x00001049,
@@ -605,7 +586,7 @@ const Y_LOOKUP_ENCODE: [KeyType; 256] = [
     0x00492400, 0x00492402, 0x00492410, 0x00492412, 0x00492480, 0x00492482, 0x00492490, 0x00492492,
 ];
 
-const Z_LOOKUP_ENCODE: [KeyType; 256] = [
+const X_LOOKUP_ENCODE: [KeyType; 256] = [
     0x00000000, 0x00000004, 0x00000020, 0x00000024, 0x00000100, 0x00000104, 0x00000120, 0x00000124,
     0x00000800, 0x00000804, 0x00000820, 0x00000824, 0x00000900, 0x00000904, 0x00000920, 0x00000924,
     0x00004000, 0x00004004, 0x00004020, 0x00004024, 0x00004100, 0x00004104, 0x00004120, 0x00004124,
@@ -640,7 +621,7 @@ const Z_LOOKUP_ENCODE: [KeyType; 256] = [
     0x00924800, 0x00924804, 0x00924820, 0x00924824, 0x00924900, 0x00924904, 0x00924920, 0x00924924,
 ];
 
-const X_LOOKUP_DECODE: [KeyType; 512] = [
+const Z_LOOKUP_DECODE: [KeyType; 512] = [
     0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3, 0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3,
     0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3, 0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3,
     4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7,
@@ -678,7 +659,7 @@ const Y_LOOKUP_DECODE: [KeyType; 512] = [
     4, 4, 5, 5, 4, 4, 5, 5, 4, 4, 5, 5, 4, 4, 5, 5, 6, 6, 7, 7, 6, 6, 7, 7, 6, 6, 7, 7, 6, 6, 7, 7,
 ];
 
-const Z_LOOKUP_DECODE: [KeyType; 512] = [
+const X_LOOKUP_DECODE: [KeyType; 512] = [
     0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1,
     2, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3,
     0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1,
@@ -710,14 +691,83 @@ const BYTE_DISPLACEMENT: KeyType = 8;
 // Mask encapsulating a bit.
 const NINE_BIT_MASK: KeyType = 0x1FF;
 
+
+/// Subroutine in less than function, equivalent to comparing floor of log_2(x). Adapted from [3].
+fn most_significant_bit(x: u64, y: u64) -> bool {
+    (x < y) & (x < (x ^ y))
+}
+
+/// Implementation of Algorithm 12 in [1]. to compare the ordering of two **Morton Keys**. If key
+/// `a` is less than key `b`, this function evaluates to true.
+fn less_than(a: &MortonKey, b: &MortonKey) -> Option<bool> {
+    // If anchors match, the one at the coarser level has the lesser Morton id.
+    let same_anchor =
+        (a.anchor[0] == b.anchor[0])
+        & (a.anchor[1] == b.anchor[1])
+        & (a.anchor[2] == b.anchor[2]);
+
+    match same_anchor {
+        true => {
+            if a.level() < b.level() {
+                Some(true)
+            } else {
+                Some(false)
+            }
+        }
+        false => {
+            let x = vec![
+                a.anchor[0] ^ b.anchor[0],
+                a.anchor[1] ^ b.anchor[1],
+                a.anchor[2] ^ b.anchor[2]
+            ];
+
+            let mut argmax = 0;
+
+            for dim in 1..3 {
+                if most_significant_bit(x[argmax as usize], x[dim as usize]) {
+                    argmax = dim
+                }
+            }
+
+            match argmax {
+                0 => {
+                    if a.anchor[0] < b.anchor[0] {
+                        Some(true)
+                    } else {
+                        Some(false)
+                    }
+                }
+                1 => {
+                    if a.anchor[1] < b.anchor[1] {
+                        Some(true)
+                    } else {
+                        Some(false)
+                    }
+                }
+                2 => {
+                    if a.anchor[2] < b.anchor[2] {
+                        Some(true)
+                    } else {
+                        Some(false)
+                    }
+                }
+                _ => None,
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::Rng;
+
+    use crate::serial_octree::{Tree, LinearTree};
 
     /// Test the encoding table for the x-coordinate.
     #[test]
-    fn test_x_encode_table() {
-        for (mut index, actual) in X_LOOKUP_ENCODE.iter().enumerate() {
+    fn test_z_encode_table() {
+        for (mut index, actual) in Z_LOOKUP_ENCODE.iter().enumerate() {
             let mut sum: KeyType = 0;
 
             for shift in 0..8 {
@@ -746,8 +796,8 @@ mod tests {
 
     /// Test the encoding table for the z-coordinate.
     #[test]
-    fn test_z_encode_table() {
-        for (mut index, actual) in Z_LOOKUP_ENCODE.iter().enumerate() {
+    fn test_x_encode_table() {
+        for (mut index, actual) in X_LOOKUP_ENCODE.iter().enumerate() {
             let mut sum: KeyType = 0;
 
             for shift in 0..8 {
@@ -761,8 +811,8 @@ mod tests {
 
     /// Test the decoding table for the x-coordinate.
     #[test]
-    fn test_x_decode_table() {
-        for (index, &actual) in X_LOOKUP_DECODE.iter().enumerate() {
+    fn test_z_decode_table() {
+        for (index, &actual) in Z_LOOKUP_DECODE.iter().enumerate() {
             let mut expected: KeyType = (index & 1) as KeyType;
             expected |= (((index >> 3) & 1) << 1) as KeyType;
             expected |= (((index >> 6) & 1) << 2) as KeyType;
@@ -785,8 +835,8 @@ mod tests {
 
     /// Test the decoding table for the z-coordinate.
     #[test]
-    fn test_z_decode_table() {
-        for (index, &actual) in Z_LOOKUP_DECODE.iter().enumerate() {
+    fn test_x_decode_table() {
+        for (index, &actual) in X_LOOKUP_DECODE.iter().enumerate() {
             let mut expected: KeyType = ((index >> 2) & 1) as KeyType;
             expected |= (((index >> 5) & 1) << 1) as KeyType;
             expected |= (((index >> 8) & 1) << 2) as KeyType;
@@ -803,5 +853,43 @@ mod tests {
         let actual = decode_key(encode_anchor(&anchor, DEEPEST_LEVEL));
 
         assert_eq!(anchor, actual);
+    }
+
+    /// Test that z order is maintained when sorted
+    #[test]
+    fn test_sorting() {
+
+        let npoints = 1000;
+        let mut range = rand::thread_rng();
+        let mut points: Vec<[PointType; 3]> = Vec::new();
+
+        for _ in 0..npoints {
+            points.push([range.gen(), range.gen(), range.gen()]);
+        }
+
+        let domain = Domain{
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.]
+        };
+
+        let mut keys: Vec<MortonKey> = points
+            .iter()
+            .map(|p| MortonKey::from_point(&p, &domain))
+            .collect();
+
+        keys.sort();
+        let tree = Tree::from_iterable(keys.into_iter()).linearize();
+
+        for i in 0..(tree.keys.len() - 1) {
+            let a = tree.keys[i];
+            let b = tree.keys[i+1];
+
+            assert!(less_than(&a, &b).unwrap() | (a == b));
+        }
+    }
+
+    #[test]
+    fn test_completion() {
+
     }
 }

@@ -98,26 +98,58 @@ impl LinearTree {
     }
 
     pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
-        let mut region = Vec::<MortonKey>::new();
-        let mut work_set = a.finest_ancestor(&b).children();
+        // let mut region = Vec::<MortonKey>::new();
+        // let mut work_set = a.finest_ancestor(&b).children();
 
-        let a_ancestors = a.ancestors();
-        let b_ancestors = b.ancestors();
+        let a_ancestors: HashSet<MortonKey> = a.ancestors();
+        let b_ancestors: HashSet<MortonKey> = b.ancestors();
 
-        while work_set.len() > 0 {
-            let current_item = work_set.pop().unwrap();
-            if (current_item > *a) & (current_item < *b) & !b_ancestors.contains(&current_item)
-            {
-                region.push(current_item);
-            } else if (a_ancestors.contains(&current_item))
-                | (b_ancestors.contains(&current_item))
-            {
-                let mut children = current_item.children();
-                work_set.append(&mut children);
+        let mut working_list: HashSet<MortonKey> = a.finest_ancestor(&b).children().into_iter().collect();
+
+        let mut minimal_tree: Vec<MortonKey> = Vec::new();
+
+        loop {
+            let mut aux_list: HashSet<MortonKey> = HashSet::new();
+            let mut len = 0;
+
+            for w in &working_list {
+                if ((a < w) & (w < b)) & !b_ancestors.contains(w) {
+                    aux_list.insert(*w);
+                    len += 1;
+                } else if a_ancestors.contains(w) | b_ancestors.contains(w) {
+                    for child in w.children() {
+                        aux_list.insert(child);
+                    }
+                }
+            }
+
+            if len == working_list.len() {
+                minimal_tree = aux_list.into_iter().collect();
+                break;
+            } else {
+                working_list = aux_list;
             }
         }
-        region.sort();
-        Tree::linearize_keys(region)
+
+        minimal_tree.sort();
+        minimal_tree
+
+
+
+    //     while work_set.len() > 0 {
+    //         let current_item = work_set.pop().unwrap();
+    //         if (current_item > *a) & (current_item < *b) & !b_ancestors.contains(&current_item)
+    //         {
+    //             region.push(current_item);
+    //         } else if (a_ancestors.contains(&current_item))
+    //             | (b_ancestors.contains(&current_item))
+    //         {
+    //             let mut children = current_item.children();
+    //             work_set.append(&mut children);
+    //         }
+    //     }
+    //     region.sort();
+    //     Tree::linearize_keys(region)
     }
 
     pub fn complete(&self) -> CompleteLinearTree {
