@@ -1,10 +1,8 @@
 use rand::prelude::*;
-use rand::{Rng, SeedableRng, distributions::Uniform};
-use mpi::traits::*;
-use mpi::topology::{Color, Rank};
+use rand::{SeedableRng};
+use mpi::topology::{Rank};
 
 use rusty_tree::distributed_octree::{unbalanced_tree};
-use rusty_tree::morton::{MortonKey};
 use rusty_tree::types::Domain;
 
 
@@ -12,14 +10,8 @@ fn main() {
 
     // Setup MPI
     let universe = mpi::initialize().unwrap();
-    let world = universe.world();
-    let mut world = world.split_by_color(Color::with_value(0)).unwrap();
-    let size = world.size();
-    let rank = world.rank();
-    let root_rank = 0;
 
     // 0. Experimental Parameters
-    let depth: u64 = 5;
     let ncrit: usize = 150;
     let npoints: u64 = 10000;
     let k: Rank = 2;
@@ -29,7 +21,6 @@ fn main() {
         diameter: [1., 1., 1.]
     };
 
-    // let mut range: Rng = SeedableRng::from_seed(0);
     let mut range = StdRng::seed_from_u64(0);
     let between = rand::distributions::Uniform::from(0.0..1.0);
     let mut points = Vec::new();
@@ -38,15 +29,30 @@ fn main() {
         points.push([between.sample(&mut range), between.sample(&mut range), between.sample(&mut range)])
     }
 
-    // let keys: Vec<MortonKey> = points
-    //     .iter()
-    //     .map(|p| MortonKey::from_point(&p, &domain))
-    //     .collect();
-
-    // println!("keys {:?}", keys);
-
     let tree = unbalanced_tree(
-        &ncrit, &size, &rank, &universe, points, &domain, k
+        &ncrit, &universe, points, &domain, k
     );
+
+    // Test ncrit
+    {
+        use rusty_tree::morton::MortonKey;
+        use std::collections::HashMap;
+        let mut blocks_to_points: HashMap<MortonKey, usize> = HashMap::new();
+
+        for (_, block) in tree {
+
+            if !blocks_to_points.contains_key(&block) {
+                blocks_to_points.insert(block.clone(), 1);
+            } else {
+                if let Some(b) = blocks_to_points.get_mut(&block) {
+                    *b += 1;
+                };
+            }
+        }
+
+        for (_, count) in blocks_to_points {
+            assert!(count <= ncrit);
+        }
+    }
 
 }

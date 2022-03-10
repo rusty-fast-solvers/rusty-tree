@@ -5,7 +5,6 @@ use crate::morton::MortonKey;
 use crate::DEEPEST_LEVEL;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
-use std::iter::FromIterator;
 
 pub enum NodeType {
     InteriorNode(HashSet<MortonKey>),

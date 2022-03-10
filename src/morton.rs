@@ -13,7 +13,6 @@ use mpi::{
         Equivalence, UncommittedUserDatatype, UserDatatype
     }
 };
-use const_env::from_env;
 
 use crate::types::Domain;
 use crate::types::KeyType;

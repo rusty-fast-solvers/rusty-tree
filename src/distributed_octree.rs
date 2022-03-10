@@ -2,11 +2,10 @@ use std::collections::{HashSet, HashMap};
 
 use mpi::{
     Address,
-    Count,
     datatype::{
         Equivalence, UncommittedUserDatatype, UserDatatype
     },
-    topology::{Color, Process, Rank, UserCommunicator},
+    topology::{Color, Rank, UserCommunicator},
     environment::Universe,
     traits::*
 };
@@ -16,8 +15,8 @@ use hyksort::hyksort::hyksort as hyksort;
 
 use crate::ROOT;
 use crate::morton::{MortonKey, Point};
-use crate::types::{KeyType, PointType, Domain};
-use crate::serial_octree::{Tree, LinearTree, CompleteLinearTree};
+use crate::types::{PointType, Domain};
+use crate::serial_octree::{Tree, LinearTree};
 
 
 #[derive(Debug, Clone)]
@@ -221,7 +220,7 @@ pub fn split_blocks(
     let mut refined = false;
     let mut unbalanced_tree: Vec<MortonKey> = Vec::new();
 
-    while !refined {
+    loop {
         let points_to_blocks = assign_blocks_to_points(
             leaves,
             blocktree.clone(),
@@ -253,8 +252,8 @@ pub fn split_blocks(
         }
 
         if check == blocks_to_points.len() {
-            refined = true;
             unbalanced_tree = blocktree.to_vec();
+            break;
         } else {
             blocktree = new_blocktree;
         }
@@ -271,19 +270,18 @@ pub fn split_blocks(
 
 pub fn unbalanced_tree(
     &ncrit: &usize,
-    &size: &Rank,
-    &rank: &Rank,
     universe: &Universe,
     points: Vec<[PointType; 3]>,
     domain: &Domain,
     k: Rank,
-) {
+) -> HashMap<MortonKey, MortonKey>{
 
     let comm = universe.world();
     let mut comm = comm.split_by_color(Color::with_value(0)).unwrap();
+    let rank = comm.rank();
+    let size = comm.size();
 
     // 1. Encode Points to Leaf Morton Keys
-
     // Map between points and keys
     let mut points: Vec<Point> = points
         .iter()
@@ -294,7 +292,7 @@ pub fn unbalanced_tree(
     hyksort(&mut points, k, &mut comm);
 
     // // 2.ii, find unique leaves on each processor
-    let mut leaves: Vec<MortonKey> = points
+    let leaves: Vec<MortonKey> = points
         .iter()
         .map(|p| p.morton)
         .collect();
@@ -314,8 +312,6 @@ pub fn unbalanced_tree(
     // 4. Complete region spanned by node.
     let mut tree = leaves.complete();
     tree.keys.sort();
-
-    let tree_domain = [tree.keys.iter().min().unwrap(), tree.keys.iter().max().unwrap()];
 
     // 5. Find seeds and compute the coarse blocktree
     let mut seeds = find_seeds(&tree.keys);
@@ -339,7 +335,6 @@ pub fn unbalanced_tree(
     blocktree.keys.sort();
 
     // 5.ii any data below the min seed sent to partner process
-
     let points = transfer_leaves_to_coarse_blocktree(
         &comm,
         &points,
@@ -347,35 +342,16 @@ pub fn unbalanced_tree(
         &rank,
         &size
     );
-    let leaves: Vec<MortonKey> = points
+
+    let tmp: Vec<MortonKey> = points
         .iter()
         .map(|p| p.morton)
         .collect();
 
     let leaves = Tree::from_iterable(
-        leaves.into_iter()
+        tmp.into_iter()
     ).linearize();
 
     // 6. Refine blocks based on ncrit
-    let unbalanced_tree = split_blocks(&leaves.keys, blocktree.keys, &ncrit);
-
-    let mut blocks_to_points: HashMap<MortonKey, usize> = HashMap::new();
-    let mut new_blocktree: Vec<MortonKey> = Vec::new();
-
-    for (_, block) in unbalanced_tree {
-
-        if !blocks_to_points.contains_key(&block) {
-            blocks_to_points.insert(block.clone(), 1);
-        } else {
-            if let Some(b) = blocks_to_points.get_mut(&block) {
-                *b += 1;
-            };
-        }
-    }
-
-    for (block, count) in blocks_to_points {
-        assert!(count <= ncrit);
-    }
-
-
+    split_blocks(&leaves.keys, blocktree.keys, &ncrit)
 }
