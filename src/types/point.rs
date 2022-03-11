@@ -1,0 +1,95 @@
+//! Datastructures and Algorithms for Cartesian Points in 3D.
+
+use std::cmp::Ordering;
+use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
+
+use memoffset::offset_of;
+use mpi::{
+    Address,
+    datatype::{
+        Equivalence, UncommittedUserDatatype, UserDatatype
+    }
+};
+
+use crate::morton::{Key}
+
+pub type PointType = f64;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct Point {
+    pub coordinate: [PointType; 3],
+    pub global_idx: usize,
+    pub key: Key,
+}
+
+/// Vector of **Points**.
+pub type Points = Vec<Point>;
+
+
+unsafe impl Equivalence for Point {
+    type Out = UserDatatype;
+    fn equivalent_datatype() -> Self::Out {
+        UserDatatype::structured(
+            &[1, 1, 1],
+            &[
+                offset_of!(Point, coordinate) as Address,
+                offset_of!(Point, global_idx) as Address,
+                offset_of!(Point, key) as Address,
+            ],
+            &[
+                UncommittedUserDatatype::contiguous(3, &PointType::equivalent_datatype()).as_ref(),
+                UncommittedUserDatatype::contiguous(1, &usize::equivalent_datatype()).as_ref(),
+                UncommittedUserDatatype::structured(
+                    &[1, 1],
+                    &[
+                        offset_of!(Key, anchor) as Address,
+                        offset_of!(Key, morton) as Address
+                    ],
+                    &[
+                        UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype()).as_ref(),
+                        UncommittedUserDatatype::contiguous(1, &KeyType::equivalent_datatype()).as_ref(),
+                    ]
+                ).as_ref()
+            ]
+        )
+    }
+}
+
+impl Default for Point {
+    fn default() -> Self {
+        Point {
+            coordinate: [PointType::default(), PointType::default(), PointType::default()],
+            global_idx: usize::default(),
+            key: Key::default(),
+        }
+    }
+}
+
+impl PartialEq for Point {
+    fn eq(&self, other: &Self) -> bool {
+        self.key == other.key
+    }
+}
+
+impl Eq for Point {}
+
+impl Ord for Point {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.key.cmp(&other.key)
+    }
+}
+
+impl PartialOrd for Point {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // less_than(&self.morton, &other.morton)
+        Some(self.key.cmp(&other.key))
+    }
+}
+
+impl Hash for Point {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.key.hash(state);
+    }
+}

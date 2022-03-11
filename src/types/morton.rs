@@ -1,4 +1,4 @@
-//! Routines for Morton encoding and decoding.
+//! Datastructure and Algorithms for Morton Keys.
 
 use itertools::izip;
 
@@ -14,40 +14,31 @@ use mpi::{
     }
 };
 
-use crate::types::Domain;
-use crate::types::KeyType;
-use crate::types::PointType;
+use crate::domain::Domain;
 
 // #[from_env("DEEPEST_LEVEL")]
 pub const DEEPEST_LEVEL: KeyType = 16;
 pub const LEVEL_SIZE: KeyType = 1 << DEEPEST_LEVEL;
-pub const ROOT: MortonKey = MortonKey{anchor: [0, 0, 0], morton: 0};
+pub const ROOT: Key = Key{anchor: [0, 0, 0], morton: 0};
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
-pub struct Point {
-    pub coordinate: [PointType; 3],
-    pub morton: MortonKey,
-}
-
+pub type KeyType = u64;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 /// Representation of a Morton key.
-pub struct MortonKey {
+pub struct Key {
     pub anchor: [KeyType; 3],
     pub morton: KeyType,
 }
 
-
-unsafe impl Equivalence for MortonKey {
+unsafe impl Equivalence for Key {
     type Out = UserDatatype;
     fn equivalent_datatype() -> Self::Out {
         UserDatatype::structured(
             &[1, 1],
             &[
-                offset_of!(MortonKey, anchor) as Address,
-                offset_of!(MortonKey, morton) as Address
+                offset_of!(Key, anchor) as Address,
+                offset_of!(Key, morton) as Address
             ],
             &[
                 UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype()).as_ref(),
@@ -57,52 +48,17 @@ unsafe impl Equivalence for MortonKey {
     }
 }
 
-unsafe impl Equivalence for Point {
-    type Out = UserDatatype;
-    fn equivalent_datatype() -> Self::Out {
-        UserDatatype::structured(
-            &[1, 1],
-            &[
-                offset_of!(Point, coordinate) as Address,
-                offset_of!(Point, morton) as Address,
-            ],
-            &[
-                UncommittedUserDatatype::contiguous(3, &PointType::equivalent_datatype()).as_ref(),
-                UncommittedUserDatatype::structured(
-                    &[1, 1],
-                    &[
-                        offset_of!(MortonKey, anchor) as Address,
-                        offset_of!(MortonKey, morton) as Address
-                    ],
-                    &[
-                        UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype()).as_ref(),
-                        UncommittedUserDatatype::contiguous(1, &KeyType::equivalent_datatype()).as_ref(),
-                    ]
-                ).as_ref()
-            ]
-        )
-    }
-}
 
-impl Default for Point {
+impl Default for Key {
     fn default() -> Self {
-        Point {
-            coordinate: [PointType::default(), PointType::default(), PointType::default()],
-            morton: MortonKey::default(),
-        }
-    }
-}
-
-impl Default for MortonKey {
-    fn default() -> Self {
-        MortonKey {
+        Key {
             anchor: [KeyType::default(), KeyType::default(), KeyType::default()],
             morton: KeyType::default()
         }
     }
 }
 
-impl MortonKey {
+impl Key {
     /// Return the anchor
     pub fn anchor(&self) -> &[KeyType; 3] {
         &self.anchor
@@ -118,27 +74,27 @@ impl MortonKey {
         find_level(self.morton)
     }
 
-    /// Return a `MortonKey` type from a Morton index
+    /// Return a `Key` type from a Morton index
     pub fn from_morton(morton: KeyType) -> Self {
         let anchor = decode_key(morton);
 
-        MortonKey { anchor, morton }
+        Key { anchor, morton }
     }
 
-    /// Return a `MortonKey` type from the anchor on the deepest level
+    /// Return a `Key` type from the anchor on the deepest level
     pub fn from_anchor(anchor: &[KeyType; 3]) -> Self {
         let morton = encode_anchor(&anchor, DEEPEST_LEVEL);
 
-        MortonKey {
+        Key {
             anchor: anchor.to_owned(),
             morton: morton,
         }
     }
 
-    /// Return a `MortonKey` associated with the box that encloses the point on the deepest level
+    /// Return a `Key` associated with the box that encloses the point on the deepest level
     pub fn from_point(point: &[PointType; 3], domain: &Domain) -> Self {
         let anchor = point_to_anchor(&point, DEEPEST_LEVEL, &domain.origin, &domain.diameter);
-        MortonKey::from_anchor(&anchor)
+        Key::from_anchor(&anchor)
     }
 
     /// Return the parent
@@ -152,12 +108,12 @@ impl MortonKey {
 
         let parent_morton = (parent_morton_without_level << LEVEL_DISPLACEMENT) | parent_level;
 
-        MortonKey::from_morton(parent_morton)
+        Key::from_morton(parent_morton)
     }
 
     /// Return the first child
     pub fn first_child(&self) -> Self {
-        MortonKey {
+        Key {
             anchor: self.anchor,
             morton: 1 + self.morton,
         }
@@ -165,7 +121,7 @@ impl MortonKey {
 
     /// Return the first child on the deepest level
     pub fn finest_first_child(&self) -> Self {
-        MortonKey {
+        Key {
             anchor: self.anchor,
             morton: DEEPEST_LEVEL - self.level() + self.morton,
         }
@@ -177,16 +133,16 @@ impl MortonKey {
         let nlevels = DEEPEST_LEVEL - self.level();
         let mask: KeyType = (1 << 3 * nlevels) - 1;
         let morton = morton | mask;
-        MortonKey::from_morton(morton + DEEPEST_LEVEL)
+        Key::from_morton(morton + DEEPEST_LEVEL)
     }
 
     /// Return all children in order of their Morton indices
-    pub fn children(&self) -> Vec<MortonKey> {
+    pub fn children(&self) -> Vec<Key> {
         let level = self.level();
         let morton = self.morton() >> LEVEL_DISPLACEMENT;
 
         let mut children_morton: [KeyType; 8] = [0; 8];
-        let mut children: Vec<MortonKey> = Vec::with_capacity(8);
+        let mut children: Vec<Key> = Vec::with_capacity(8);
         let bit_shift = 3 * (DEEPEST_LEVEL - level - 1);
         for (index, item) in children_morton.iter_mut().enumerate() {
             *item =
@@ -194,32 +150,32 @@ impl MortonKey {
         }
 
         for &child_morton in children_morton.iter() {
-            children.push(MortonKey::from_morton(child_morton))
+            children.push(Key::from_morton(child_morton))
         }
 
         children
     }
 
     /// Return all children of the parent of the current Morton index
-    pub fn siblings(&self) -> Vec<MortonKey> {
+    pub fn siblings(&self) -> Vec<Key> {
         self.parent().children()
     }
 
     /// Check if the key is ancestor of `other`.
-    pub fn is_ancestor(&self, other: &MortonKey) -> bool {
+    pub fn is_ancestor(&self, other: &Key) -> bool {
         let ancestors = other.ancestors();
 
         ancestors.contains(self)
     }
 
     /// Check if key is descendent of another key
-    pub fn is_descendent(&self, other: &MortonKey) -> bool {
+    pub fn is_descendent(&self, other: &Key) -> bool {
         other.is_ancestor(self)
     }
 
     /// Return set of all ancestors
-    pub fn ancestors(&self) -> HashSet<MortonKey> {
-        let mut ancestors = HashSet::<MortonKey>::new();
+    pub fn ancestors(&self) -> HashSet<Key> {
+        let mut ancestors = HashSet::<Key>::new();
 
         let mut current = self.clone();
 
@@ -232,7 +188,7 @@ impl MortonKey {
     }
 
     /// Find the finest ancestor of key and another key
-    pub fn finest_ancestor(&self, other: &MortonKey) -> MortonKey {
+    pub fn finest_ancestor(&self, other: &Key) -> Key {
         if self == other {
             return other.clone();
         } else {
@@ -343,7 +299,7 @@ impl MortonKey {
     /// # Arguments
     /// * `direction` - A vector describing how many boxes we move along each coordinate direction.
     ///               Negative values are possible (meaning that we move backwards).
-    pub fn find_key_in_direction(&self, direction: &[i64; 3]) -> Option<MortonKey> {
+    pub fn find_key_in_direction(&self, direction: &[i64; 3]) -> Option<Key> {
         let level = self.level();
 
         let max_number_of_boxes: i64 = 1 << level;
@@ -366,7 +322,7 @@ impl MortonKey {
         {
             let new_anchor: [KeyType; 3] = [x as KeyType, y as KeyType, z as KeyType];
             let new_morton = encode_anchor(&new_anchor, level);
-            Some(MortonKey {
+            Some(Key {
                 anchor: new_anchor,
                 morton: new_morton,
             })
@@ -376,59 +332,30 @@ impl MortonKey {
     }
 }
 
-impl PartialEq for MortonKey {
+impl PartialEq for Key {
     fn eq(&self, other: &Self) -> bool {
         self.morton == other.morton
     }
 }
 
-impl PartialEq for Point {
-    fn eq(&self, other: &Self) -> bool {
-        self.morton == other.morton
-    }
-}
 
-impl Eq for MortonKey {}
+impl Eq for Key {}
 
-impl Eq for Point {}
-
-
-impl Ord for MortonKey {
+impl Ord for Key {
     fn cmp(&self, other: &Self) -> Ordering {
         self.morton.cmp(&other.morton)
     }
 }
-
-impl Ord for Point {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.morton.cmp(&other.morton)
-    }
-}
-
-
-impl PartialOrd for MortonKey {
+impl PartialOrd for Key {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
     //    less_than(self, other)
         Some(self.morton.cmp(&other.morton))
     }
 }
 
-impl PartialOrd for Point {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        // less_than(&self.morton, &other.morton)
-        Some(self.morton.morton.cmp(&other.morton.morton))
-    }
-}
-
-impl Hash for MortonKey {
+impl Hash for Key {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.morton.hash(state);
-    }
-}
-
-impl Hash for Point {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.morton.morton.hash(state);
     }
 }
 
@@ -698,7 +625,7 @@ fn most_significant_bit(x: u64, y: u64) -> bool {
 
 /// Implementation of Algorithm 12 in [1]. to compare the ordering of two **Morton Keys**. If key
 /// `a` is less than key `b`, this function evaluates to true.
-fn less_than(a: &MortonKey, b: &MortonKey) -> Option<bool> {
+fn less_than(a: &Key, b: &Key) -> Option<bool> {
     // If anchors match, the one at the coarser level has the lesser Morton id.
     let same_anchor =
         (a.anchor[0] == b.anchor[0])
@@ -871,9 +798,9 @@ mod tests {
             diameter: [1., 1., 1.]
         };
 
-        let mut keys: Vec<MortonKey> = points
+        let mut keys: Vec<Key> = points
             .iter()
-            .map(|p| MortonKey::from_point(&p, &domain))
+            .map(|p| Key::from_point(&p, &domain))
             .collect();
 
         keys.sort();
@@ -885,10 +812,5 @@ mod tests {
 
             assert!(less_than(&a, &b).unwrap() | (a == b));
         }
-    }
-
-    #[test]
-    fn test_completion() {
-
     }
 }
