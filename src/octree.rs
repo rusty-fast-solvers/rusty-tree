@@ -4,7 +4,7 @@
 
 use crate::{
     constants::DEEPEST_LEVEL,
-    types::morton::Key as Key
+    types::morton::{MortonKey, KeyType}
 };
 
 use itertools::Itertools;
@@ -12,23 +12,23 @@ use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
 pub struct Tree {
-    pub keys: HashSet<Key>,
+    pub keys: HashSet<MortonKey>,
 }
 
 #[derive(Debug)]
 pub struct LinearTree {
-    pub keys: Vec<Key>,
+    pub keys: Vec<MortonKey>,
 }
 
 #[derive(Debug)]
 pub struct CompleteLinearTree {
-    pub keys: Vec<Key>,
+    pub keys: Vec<MortonKey>,
 }
 
 impl Tree {
-    pub fn from_iterable<T: Iterator<Item = Key>>(keys: T) -> Tree {
+    pub fn from_iterable<T: Iterator<Item = MortonKey>>(keys: T) -> Tree {
 
-        let mut key_set = HashSet::<Key>::new();
+        let mut key_set = HashSet::<MortonKey>::new();
 
         for item in keys {
             key_set.insert(item.clone());
@@ -37,7 +37,7 @@ impl Tree {
         Tree { keys: key_set }
     }
 
-    pub fn linearize_keys(mut keys: Vec<Key>) -> Vec<Key> {
+    pub fn linearize_keys(mut keys: Vec<MortonKey>) -> Vec<MortonKey> {
 
         // To linearize the tree we first sort it.
         keys.sort();
@@ -45,7 +45,7 @@ impl Tree {
         let nkeys = keys.len();
 
         // Then we remove the ancestors.
-        let mut new_keys = Vec::<Key>::with_capacity(keys.len());
+        let mut new_keys = Vec::<MortonKey>::with_capacity(keys.len());
 
         // Now check pairwise for ancestor relationship and only add to new vector if item
         // is not an ancestor of the next item. Add final element.
@@ -62,7 +62,7 @@ impl Tree {
     }
 
     pub fn linearize(&self) -> LinearTree {
-        let keys: Vec<Key> = self.keys.iter().copied().collect::<Vec<Key>>();
+        let keys: Vec<MortonKey> = self.keys.iter().copied().collect::<Vec<MortonKey>>();
 
         LinearTree { keys: Tree::linearize_keys(keys) }
     }
@@ -73,13 +73,13 @@ impl LinearTree {
     pub fn linearize(&self) -> LinearTree {
         // To linearize the tree we first sort it.
 
-        let mut keys: Vec<Key> = self.keys.iter().copied().collect::<Vec<Key>>();
+        let mut keys: Vec<MortonKey> = self.keys.iter().copied().collect::<Vec<MortonKey>>();
         keys.sort();
 
         let nkeys = self.keys.len();
 
         // Then we remove the ancestors.
-        let mut new_keys = Vec::<Key>::with_capacity(self.keys.len());
+        let mut new_keys = Vec::<MortonKey>::with_capacity(self.keys.len());
 
         // Now check pairwise for ancestor relationship and only add to new vector if item
         // is not an ancestor of the next item. Add final element.
@@ -95,19 +95,19 @@ impl LinearTree {
         LinearTree { keys: new_keys }
     }
 
-    pub fn complete_region(a: &Key, b: &Key) -> Vec<Key> {
+    pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
         // let mut region = Vec::<Key>::new();
         // let mut work_set = a.finest_ancestor(&b).children();
 
-        let a_ancestors: HashSet<Key> = a.ancestors();
-        let b_ancestors: HashSet<Key> = b.ancestors();
+        let a_ancestors: HashSet<MortonKey> = a.ancestors();
+        let b_ancestors: HashSet<MortonKey> = b.ancestors();
 
-        let mut working_list: HashSet<Key> = a.finest_ancestor(&b).children().into_iter().collect();
+        let mut working_list: HashSet<MortonKey> = a.finest_ancestor(&b).children().into_iter().collect();
 
-        let mut minimal_tree: Vec<Key> = Vec::new();
+        let mut minimal_tree: Vec<MortonKey> = Vec::new();
 
         loop {
-            let mut aux_list: HashSet<Key> = HashSet::new();
+            let mut aux_list: HashSet<MortonKey> = HashSet::new();
             let mut len = 0;
 
             for w in &working_list {
@@ -161,9 +161,9 @@ impl LinearTree {
 impl CompleteLinearTree {
     pub fn compute_interior_weights(
         &self,
-        root: &Key,
+        root: &MortonKey,
         weights: &Vec<f64>,
-    ) -> HashMap<Key, f64> {
+    ) -> HashMap<MortonKey, f64> {
         assert!(
             self.keys.len() == weights.len(),
             "Keys and weights must have the same length."
@@ -175,7 +175,7 @@ impl CompleteLinearTree {
             "`root` is not ancestor of the keys."
         );
 
-        let mut weights_map = HashMap::<Key, f64>::new();
+        let mut weights_map = HashMap::<MortonKey, f64>::new();
 
         // Traverse tree bottom up to compute all weights
 
@@ -199,14 +199,14 @@ impl CompleteLinearTree {
 
     pub fn coarsen_by_weights(
         &self,
-        root: &Key,
+        root: &MortonKey,
         weights: &Vec<f64>,
         max_weight: f64,
     ) -> CompleteLinearTree {
         fn coarsen_impl(
-            key: &Key,
-            weights: &HashMap<Key, f64>,
-            result_keys: &mut Vec<Key>,
+            key: &MortonKey,
+            weights: &HashMap<MortonKey, f64>,
+            result_keys: &mut Vec<MortonKey>,
             max_weight: f64,
         ) {
             if key.level() == DEEPEST_LEVEL {
@@ -230,7 +230,7 @@ impl CompleteLinearTree {
         }
 
         let weights_map = self.compute_interior_weights(&root, &weights);
-        let mut result_keys = Vec::<Key>::with_capacity(self.keys.len());
+        let mut result_keys = Vec::<MortonKey>::with_capacity(self.keys.len());
         coarsen_impl(root, &weights_map, &mut result_keys, max_weight);
         result_keys.sort();
 

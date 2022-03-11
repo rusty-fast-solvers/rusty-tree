@@ -1,6 +1,5 @@
 use std::collections::{HashSet, HashMap};
 
-use memoffset::offset_of;
 use mpi::{
     Address,
     datatype::{
@@ -10,21 +9,25 @@ use mpi::{
     environment::Universe,
     traits::*
 };
+use memoffset::offset_of;
 
 use hyksort::hyksort::hyksort as hyksort;
 
-use crate::ROOT;
 use crate::{
-    morton::Key, 
-    point::{PointType, Point}, 
-    domain::{Domain, MortonDomain} 
-    serial_octree::{Tree, LinearTree};
-}
-
+    constants::ROOT,
+    octree::{
+        Tree, LinearTree
+    },
+    types::{
+        domain::Domain,
+        morton::MortonKey,
+        point::{Point, PointType},
+    }
+};
 
 /// Complete a distributed blocktree from the seed octants, algorithm 4 in [1] (parallel).
 pub fn complete_blocktree(
-    seeds: mortonec<Key>,
+    seeds: &mut Vec<MortonKey>,
     &rank: &Rank,
     &size: &Rank,
     world: &UserCommunicator,
@@ -59,7 +62,7 @@ pub fn complete_blocktree(
         previous_process.send(&min);
     }
 
-    let mut bomorton = Key::default();
+    let mut boundary = MortonKey::default();
 
     if rank < (size - 1) {
         next_process.receive_into(&mut boundary);
@@ -73,7 +76,7 @@ pub fn complete_blocktree(
         let a = seeds[i];
         let b = seeds[i + 1];
 
-        let mut mortonec<Key> = LinearTree::complete_region(&a, &b);
+        let mut tmp: Vec<MortonKey> = LinearTree::complete_region(&a, &b);
         local_blocktree.keys.push(a);
         local_blocktree.keys.append(&mut tmp);
     }
@@ -89,14 +92,14 @@ pub fn complete_blocktree(
 pub fn transfer_leaves_to_coarse_blocktree(
     comm: &UserCommunicator,
     points: &Vec<Point>,
-    seemortonec<Key>,
+    seeds: &Vec<MortonKey>,
     &rank: &Rank,
     &size:& Rank,
 ) -> Vec<Point> {
 
     let mut received_points : Vec<Point> = Vec::new();
 
-    let mut mimorton = Key::default();
+    let mut min_seed = MortonKey::default();
 
     if rank == 0 {
         min_seed = points.iter().min().unwrap().key;
@@ -140,10 +143,10 @@ pub fn transfer_leaves_to_coarse_blocktree(
     received_points
 }
 
-pub fn find_seeds(local_leavmortonec<Key>mortonec<Key> {
+pub fn find_seeds(local_leaves: &Vec<MortonKey>) -> Vec<MortonKey> {
 
-    mortonn: Key = local_leaves.iter().min().unwrap().clone();
-    mortonx: Key = local_leaves.iter().max().unwrap().clone();
+    let min: MortonKey = local_leaves.iter().min().unwrap().clone();
+    let max: MortonKey = local_leaves.iter().max().unwrap().clone();
 
     // Complete the region between the least and greatest leaves.
 
@@ -155,7 +158,7 @@ pub fn find_seeds(local_leavmortonec<Key>mortonec<Key> {
 
     let coarsest_level = complete.iter().map(|k| k.level()).min().unwrap();
 
-    let semortonec<Key> = complete
+    let seeds: Vec<MortonKey> = complete
         .into_iter().filter(|k| k.level() == coarsest_level).collect();
 
     seeds
@@ -163,12 +166,12 @@ pub fn find_seeds(local_leavmortonec<Key>mortonec<Key> {
 }
 
 pub fn assign_blocks_to_points(
-    leavmortonec<Key>,
-    blocktmortonec<Key>,
-) ->mortony, Key> {
+    leaves: &Vec<MortonKey>,
+    blocktree: Vec<MortonKey>,
+) -> HashMap<MortonKey, MortonKey> {
 
-    let blocktree_set:mortonet<Key> = blocktree.iter().cloned().collect();
-    let mut map :mortony, Key> = HashMap::new();
+    let blocktree_set: HashSet<MortonKey> = blocktree.iter().cloned().collect();
+    let mut map : HashMap<MortonKey, MortonKey> = HashMap::new();
 
     for leaf in leaves.iter() {
 
@@ -188,13 +191,13 @@ pub fn assign_blocks_to_points(
 }
 
 pub fn split_blocks(
-    leavmortonec<Key>,
-    mut blocktmortonec<Key>,
+    leaves: &Vec<MortonKey>,
+    mut blocktree: Vec<MortonKey>,
     &ncrit: &usize
-) ->mortony, Key> {
+) -> HashMap<MortonKey, MortonKey> {
 
     let mut refined = false;
-    let mut unbalanced_tmortonec<Key> = Vec::new();
+    let mut unbalanced_tree: Vec<MortonKey> = Vec::new();
 
     loop {
         let points_to_blocks = assign_blocks_to_points(
@@ -202,8 +205,8 @@ pub fn split_blocks(
             blocktree.clone(),
         );
 
-        let mut blocks_to_points:mortonap<Key, usize> = HashMap::new();
-        let mut new_blocktmortonec<Key> = Vec::new();
+        let mut blocks_to_points: HashMap<MortonKey, usize> = HashMap::new();
+        let mut new_blocktree: Vec<MortonKey> = Vec::new();
 
         for (_, block) in points_to_blocks {
 
@@ -250,7 +253,7 @@ pub fn unbalanced_tree(
     points: Vec<[PointType; 3]>,
     domain: &Domain,
     k: Rank,
-) ->mortony, Key>{
+) -> HashMap<MortonKey, MortonKey>{
 
     let comm = universe.world();
     let mut comm = comm.split_by_color(Color::with_value(0)).unwrap();
@@ -261,14 +264,14 @@ pub fn unbalanced_tree(
     // Map between points and keys
     let mut points: Vec<Point> = points
         .iter()
-        .map(|p| Point{coordinate: p.clone(), global_idx:mortony: Key::from_point(&p, &domain)})
+        .map(|p| Point{coordinate: p.clone(), global_idx: 0, key: MortonKey::from_point(&p, &domain)})
         .collect();
 
     // 2.i Perform parallel Morton sort over encoded points
     hyksort(&mut points, k, &mut comm);
 
     // // 2.ii, find unique leaves on each processor
-    let leamortonec<Key> = points
+    let leaves: Vec<MortonKey> = points
         .iter()
         .map(|p| p.key)
         .collect();
@@ -319,7 +322,7 @@ pub fn unbalanced_tree(
         &size
     );
 
-    let mortonec<Key> = points
+    let tmp: Vec<MortonKey> = points
         .iter()
         .map(|p| p.key)
         .collect();

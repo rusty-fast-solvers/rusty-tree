@@ -1,4 +1,4 @@
-//! Datastructures and Algorithms for Cartesian Points in 3D.
+//! Data Strictires and Algorithms for Cartesian Points in 3D.
 
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -12,7 +12,7 @@ use mpi::{
     }
 };
 
-use crate::morton::{Key}
+use crate::types::morton::{MortonKey, KeyType};
 
 pub type PointType = f64;
 
@@ -21,12 +21,11 @@ pub type PointType = f64;
 pub struct Point {
     pub coordinate: [PointType; 3],
     pub global_idx: usize,
-    pub key: Key,
+    pub key: MortonKey,
 }
 
 /// Vector of **Points**.
 pub type Points = Vec<Point>;
-
 
 unsafe impl Equivalence for Point {
     type Out = UserDatatype;
@@ -44,8 +43,8 @@ unsafe impl Equivalence for Point {
                 UncommittedUserDatatype::structured(
                     &[1, 1],
                     &[
-                        offset_of!(Key, anchor) as Address,
-                        offset_of!(Key, morton) as Address
+                        offset_of!(MortonKey, anchor) as Address,
+                        offset_of!(MortonKey, morton) as Address
                     ],
                     &[
                         UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype()).as_ref(),
@@ -62,7 +61,7 @@ impl Default for Point {
         Point {
             coordinate: [PointType::default(), PointType::default(), PointType::default()],
             global_idx: usize::default(),
-            key: Key::default(),
+            key: MortonKey::default(),
         }
     }
 }

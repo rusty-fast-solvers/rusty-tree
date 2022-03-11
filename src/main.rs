@@ -2,8 +2,8 @@ use rand::prelude::*;
 use rand::{SeedableRng};
 use mpi::topology::{Rank};
 
-use rusty_tree::distributed_octree::{unbalanced_tree};
-use rusty_tree::types::Domain;
+use rusty_tree::distribute::unbalanced_tree;
+use rusty_tree::types::domain::Domain;
 
 
 fn main() {
@@ -35,7 +35,7 @@ fn main() {
 
     // Test ncrit
     {
-        use rusty_tree::morton::MortonKey;
+        use rusty_tree::types::morton::MortonKey;
         use std::collections::HashMap;
         let mut blocks_to_points: HashMap<MortonKey, usize> = HashMap::new();
 

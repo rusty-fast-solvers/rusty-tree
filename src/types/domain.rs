@@ -1,5 +1,21 @@
 //! Definition of basic types
 
+use memoffset::offset_of;
+use mpi::{
+    Address,
+    datatype::{
+        Equivalence, UncommittedUserDatatype, UserDatatype
+    },
+    topology::Rank
+};
+
+use crate::{
+    types::{
+        morton::{MortonKey, KeyType},
+        point::PointType
+    }
+};
+
 pub struct Domain {
     pub origin: [PointType; 3],
     pub diameter: [PointType; 3],
@@ -8,8 +24,8 @@ pub struct Domain {
 #[derive(Debug, Clone)]
 pub struct MortonDomain {
     pub rank: Rank,
-    pub left: Key,
-    pub right: Key,
+    pub left: MortonKey,
+    pub right: MortonKey,
 }
 
 unsafe impl Equivalence for MortonDomain {
@@ -27,8 +43,8 @@ unsafe impl Equivalence for MortonDomain {
                 UncommittedUserDatatype::structured(
                     &[1, 1],
                     &[
-                        offset_of!(Key, anchor) as Address,
-                        offset_of!(Key, morton) as Address
+                        offset_of!(MortonKey, anchor) as Address,
+                        offset_of!(MortonKey, morton) as Address
                     ],
                     &[
                         UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype()).as_ref(),
@@ -38,8 +54,8 @@ unsafe impl Equivalence for MortonDomain {
                 UncommittedUserDatatype::structured(
                     &[1, 1],
                     &[
-                        offset_of!(Key, anchor) as Address,
-                        offset_of!(Key, morton) as Address
+                        offset_of!(MortonKey, anchor) as Address,
+                        offset_of!(MortonKey, morton) as Address
                     ],
                     &[
                         UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype()).as_ref(),
