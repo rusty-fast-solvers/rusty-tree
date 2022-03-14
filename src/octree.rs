@@ -44,38 +44,30 @@ impl Tree {
 
     pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
         // let mut region = Vec::<Key>::new();
-        // let mut work_set = a.finest_ancestor(&b).children();
 
-        let a_ancestors: HashSet<MortonKey> = a.ancestors();
-        let b_ancestors: HashSet<MortonKey> = b.ancestors();
+        let mut a_ancestors: HashSet<MortonKey> = a.ancestors();
+        let mut b_ancestors: HashSet<MortonKey> = b.ancestors();
 
-        let mut working_list: HashSet<MortonKey> = a.finest_ancestor(&b).children().into_iter().collect();
+        a_ancestors.remove(a);
+        b_ancestors.remove(b);
+
+        let mut work_list: Vec<MortonKey> = a.finest_ancestor(&b).children().into_iter().collect();
 
         let mut minimal_tree: Vec<MortonKey> = Vec::new();
 
-        loop {
-            let mut aux_list: HashSet<MortonKey> = HashSet::new();
-            let mut len = 0;
-
-            for w in &working_list {
-                if ((a < w) & (w < b)) & !b_ancestors.contains(w) {
-                    minimal_tree.push(*w);
-                    len += 1;
-                } else if a_ancestors.contains(w) | b_ancestors.contains(w) {
-                    for child in w.children() {
-                        aux_list.insert(child);
-                    }
-                }
-            }
-
-            if len == working_list.len() {
-                // minimal_tree = aux_list.into_iter().collect();
-                break;
-            } else {
-                working_list = aux_list;
+        while work_list.len() > 0 {
+        // println!("work list {:?} \n", work_list);
+            let current_item = work_list.pop().unwrap();
+            if (current_item > *a) & (current_item < *b) & !b_ancestors.contains(&current_item)
+            {
+                minimal_tree.push(current_item);
+            } else if (a_ancestors.contains(&current_item)) | (b_ancestors.contains(&current_item))
+            {
+                let mut children = current_item.children();
+                work_list.append(&mut children);
             }
         }
-
+        
         minimal_tree.sort();
         minimal_tree
     }
@@ -191,24 +183,25 @@ mod tests {
         let a: MortonKey = MortonKey { anchor: [0, 0, 0], morton: 0};
         let b: MortonKey = MortonKey {anchor: [65535, 65535, 65535], morton: 0b111111111111111111111111111111111111111111111111000000000010000};
         
-        // println!("dld {:?} dfd {:?}", a.finest_last_child(), a.finest_first_child());
-        // assert!(false);
-        // println!("finst ancestors {:?}", a.finest_ancestor(&b));
-        let mut result = Tree::complete_region(&a, &b);
-        // let fa = a.finest_ancestor(&b);
+        let mut region = Tree::complete_region(&a, &b);
 
-        // let min = result.iter().min().unwrap();
-        // let max = result.iter().max().unwrap();
+        let fa = a.finest_ancestor(&b);
 
-        // Test that bounds are satisfied
-        // println!("a {:?} min {:?}", a, min);
-        // assert!(a <= *min);
-        // assert!(b >= *max);
+        let min = region.iter().min().unwrap();
+        let max = region.iter().max().unwrap();
 
-        // // Test that FCA is an ancestor of all nodes in the result
-        // for node in result.iter() {
-        //     let ancestors = find_ancestors(&node, &depth);
-        //     assert!(ancestors.contains(&fca));
-        // }
+        /// Test that bounds are satisfied
+        assert!(a <= *min);
+        assert!(b >= *max);
+
+        /// Test that FCA is an ancestor of all nodes in the result
+        for node in region.iter() {
+            let ancestors = node.ancestors();
+            assert!(ancestors.contains(&fa));
+        }
+
+        /// Test that completed region doesn't contain its bounds
+        assert!(!region.contains(&a));
+        assert!(!region.contains(&b));
     }
 }
