@@ -696,71 +696,6 @@ const BYTE_DISPLACEMENT: KeyType = 8;
 const NINE_BIT_MASK: KeyType = 0x1FF;
 
 
-/// Subroutine in less than function, equivalent to comparing floor of log_2(x). Adapted from [3].
-fn most_significant_bit(x: u64, y: u64) -> bool {
-    (x < y) & (x < (x ^ y))
-}
-
-/// Implementation of Algorithm 12 in [1]. to compare the ordering of two **Morton Keys**. If key
-/// `a` is less than key `b`, this function evaluates to true.
-fn less_than(a: &MortonKey, b: &MortonKey) -> Option<bool> {
-    // If anchors match, the one at the coarser level has the lesser Morton id.
-    let same_anchor =
-        (a.anchor[0] == b.anchor[0])
-        & (a.anchor[1] == b.anchor[1])
-        & (a.anchor[2] == b.anchor[2]);
-
-    match same_anchor {
-        true => {
-            if a.level() < b.level() {
-                Some(true)
-            } else {
-                Some(false)
-            }
-        }
-        false => {
-            let x = vec![
-                a.anchor[0] ^ b.anchor[0],
-                a.anchor[1] ^ b.anchor[1],
-                a.anchor[2] ^ b.anchor[2]
-            ];
-
-            let mut argmax = 0;
-
-            for dim in 1..3 {
-                if most_significant_bit(x[argmax as usize], x[dim as usize]) {
-                    argmax = dim
-                }
-            }
-
-            match argmax {
-                0 => {
-                    if a.anchor[0] < b.anchor[0] {
-                        Some(true)
-                    } else {
-                        Some(false)
-                    }
-                }
-                1 => {
-                    if a.anchor[1] < b.anchor[1] {
-                        Some(true)
-                    } else {
-                        Some(false)
-                    }
-                }
-                2 => {
-                    if a.anchor[2] < b.anchor[2] {
-                        Some(true)
-                    } else {
-                        Some(false)
-                    }
-                }
-                _ => None,
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -768,7 +703,71 @@ mod tests {
 
     use crate::octree::Tree;
 
-    /// Test the encoding table for the x-coordinate.
+    /// Subroutine in less than function, equivalent to comparing floor of log_2(x). Adapted from [3].
+    fn most_significant_bit(x: u64, y: u64) -> bool {
+        (x < y) & (x < (x ^ y))
+    }
+
+    /// Implementation of Algorithm 12 in [1]. to compare the ordering of two **Morton Keys**. If key
+    /// `a` is less than key `b`, this function evaluates to true.
+    fn less_than(a: &MortonKey, b: &MortonKey) -> Option<bool> {
+        // If anchors match, the one at the coarser level has the lesser Morton id.
+        let same_anchor =
+            (a.anchor[0] == b.anchor[0])
+            & (a.anchor[1] == b.anchor[1])
+            & (a.anchor[2] == b.anchor[2]);
+
+        match same_anchor {
+            true => {
+                if a.level() < b.level() {
+                    Some(true)
+                } else {
+                    Some(false)
+                }
+            }
+            false => {
+                let x = vec![
+                    a.anchor[0] ^ b.anchor[0],
+                    a.anchor[1] ^ b.anchor[1],
+                    a.anchor[2] ^ b.anchor[2]
+                ];
+
+                let mut argmax = 0;
+
+                for dim in 1..3 {
+                    if most_significant_bit(x[argmax as usize], x[dim as usize]) {
+                        argmax = dim
+                    }
+                }
+
+                match argmax {
+                    0 => {
+                        if a.anchor[0] < b.anchor[0] {
+                            Some(true)
+                        } else {
+                            Some(false)
+                        }
+                    }
+                    1 => {
+                        if a.anchor[1] < b.anchor[1] {
+                            Some(true)
+                        } else {
+                            Some(false)
+                        }
+                    }
+                    2 => {
+                        if a.anchor[2] < b.anchor[2] {
+                            Some(true)
+                        } else {
+                            Some(false)
+                        }
+                    }
+                    _ => None,
+                }
+            }
+        }
+    }
+
     #[test]
     fn test_z_encode_table() {
         for (mut index, actual) in Z_LOOKUP_ENCODE.iter().enumerate() {
@@ -783,7 +782,6 @@ mod tests {
         }
     }
 
-    /// Test the encoding table for the y-coordinate.
     #[test]
     fn test_y_encode_table() {
         for (mut index, actual) in Y_LOOKUP_ENCODE.iter().enumerate() {
@@ -798,7 +796,6 @@ mod tests {
         }
     }
 
-    /// Test the encoding table for the z-coordinate.
     #[test]
     fn test_x_encode_table() {
         for (mut index, actual) in X_LOOKUP_ENCODE.iter().enumerate() {
@@ -813,7 +810,6 @@ mod tests {
         }
     }
 
-    /// Test the decoding table for the x-coordinate.
     #[test]
     fn test_z_decode_table() {
         for (index, &actual) in Z_LOOKUP_DECODE.iter().enumerate() {
@@ -825,7 +821,6 @@ mod tests {
         }
     }
 
-    /// Test the decoding table for the y-coordinate.
     #[test]
     fn test_y_decode_table() {
         for (index, &actual) in Y_LOOKUP_DECODE.iter().enumerate() {
@@ -837,7 +832,6 @@ mod tests {
         }
     }
 
-    /// Test the decoding table for the z-coordinate.
     #[test]
     fn test_x_decode_table() {
         for (index, &actual) in X_LOOKUP_DECODE.iter().enumerate() {
@@ -849,7 +843,6 @@ mod tests {
         }
     }
 
-    /// Test encoding and decoding an anchor
     #[test]
     fn test_encoding_decoding() {
         let anchor: [KeyType; 3] = [65535, 65535, 65535];
@@ -859,7 +852,6 @@ mod tests {
         assert_eq!(anchor, actual);
     }
 
-    /// Test that z order is maintained when sorted
     #[test]
     fn test_sorting() {
 
@@ -882,8 +874,10 @@ mod tests {
             .collect();
 
         keys.sort();
-        let tree = Tree::from_iterable(keys.into_iter()).linearize();
-
+        let mut tree = Tree{keys};
+        tree.linearize();
+        
+        /// Test that Z order is maintained when sorted
         for i in 0..(tree.keys.len() - 1) {
             let a = tree.keys[i];
             let b = tree.keys[i+1];

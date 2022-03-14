@@ -274,21 +274,20 @@ pub fn unbalanced_tree(
         .map(|p| p.key)
         .collect();
 
-    let mut leaves = Tree::from_iterable(
-        leaves.into_iter()
-    ).linearize();
-
-    leaves.keys.sort();
+    let mut leaves = Tree {keys: leaves};
+    leaves.linearize();
+    leaves.sort();
 
     let comm = universe.world();
     let comm = comm.split_by_color(Color::with_value(0)).unwrap();
 
     // 3. Linearise received keys (remove overlaps if they exist).
-    leaves =  leaves.linearize();
+    leaves.linearize();
 
     // 4. Complete region spanned by node.
-    let mut tree = leaves.complete();
-    tree.keys.sort();
+    let mut tree = leaves;
+    tree.complete();
+    tree.sort();
 
     // 5. Find seeds and compute the coarse blocktree
     let mut seeds = find_seeds(&tree.keys);
@@ -309,7 +308,7 @@ pub fn unbalanced_tree(
         &comm
     );
 
-    blocktree.keys.sort();
+    blocktree.sort();
 
     // 5.ii any data below the min seed sent to partner process
     let points = transfer_leaves_to_coarse_blocktree(
@@ -320,14 +319,13 @@ pub fn unbalanced_tree(
         &size
     );
 
-    let tmp: Vec<MortonKey> = points
+    let keys: Vec<MortonKey> = points
         .iter()
         .map(|p| p.key)
         .collect();
 
-    let leaves = Tree::from_iterable(
-        tmp.into_iter()
-    ).linearize();
+    let mut leaves = Tree{keys};
+    leaves.linearize();
 
     // 6. Refine blocks based on ncrit
     split_blocks(&leaves.keys, blocktree.keys, &ncrit)

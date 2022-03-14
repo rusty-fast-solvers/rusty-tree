@@ -1,14 +1,17 @@
 // //! Data structures and functions to create regular and adaptive Octrees.
 
-//! Algorithms for serial Octrees
+use std::{
+    ops::Deref,
+    collections::{HashMap, HashSet}
+};
+
+use itertools::Itertools;
 
 use crate::{
     constants::DEEPEST_LEVEL,
     types::morton::{MortonKey, KeyType}
 };
 
-use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
 pub struct Tree {
@@ -16,18 +19,6 @@ pub struct Tree {
 }
 
 impl Tree {
-    pub fn from_iterable<T: Iterator<Item = MortonKey>>(keys: T) -> Tree {
-
-        let mut key_set = HashSet::<MortonKey>::new();
-
-        for item in keys {
-            key_set.insert(item.clone());
-        }
-
-        let keys: Vec<MortonKey> = key_set.into_iter().collect();
-
-        Tree { keys }
-    }
 
      pub fn linearize_keys(mut keys: Vec<MortonKey>) -> Vec<MortonKey> {
 
@@ -91,32 +82,88 @@ impl Tree {
         minimal_tree
     }
 
-    pub fn complete(&self) -> Tree {
+    pub fn complete(self: &mut Tree) {
         let a = self.keys.iter().min().unwrap();
         let b = self.keys.iter().max().unwrap();
         let mut completion = Tree::complete_region(&a, &b);
         completion.push(a.clone());
         completion.push(b.clone());
-        Tree {keys: completion}
+        self.keys = completion;
     }
 
-    pub fn linearize(&self) -> Tree {
-        let keys: Vec<MortonKey> = self.keys.iter().copied().collect::<Vec<MortonKey>>();
+    pub fn linearize(self: &mut Tree) {
+        self.keys = Tree::linearize_keys(self.keys.clone());
+    }
 
-        Tree { keys: Tree::linearize_keys(keys) }
+    pub fn sort(self: &mut Tree) {
+        self.keys.sort();
     }
 }
+
+impl Deref for Tree {
+    type Target = Vec<MortonKey>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.keys
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::Rng;
+
+    use rand::prelude::*;
+    use rand::{SeedableRng};
 
     use crate::octree::Tree;
+    use crate::types::{
+        morton::MortonKey,
+        domain::Domain,
+        point::Point,
+    };
+
+    /// Tree fixture
+    fn tree () -> Tree {
+        let ncrit: usize = 150;
+        let npoints: u64 = 10000;
+
+        let domain = Domain{
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.]
+        };
+
+        let mut range = StdRng::seed_from_u64(0);
+        let between = rand::distributions::Uniform::from(0.0..1.0);
+        let mut points = Vec::new();
+
+        for _ in 0..npoints {
+            points.push([between.sample(&mut range), between.sample(&mut range), between.sample(&mut range)])
+        }
+
+        let mut points: Vec<Point> = points
+        .iter()
+        .map(|p| Point{coordinate: p.clone(), global_idx: 0, key: MortonKey::from_point(&p, &domain)})
+        .collect();
+        
+        let keys: Vec<MortonKey> = points
+        .iter()
+        .map(|p| p.key)
+        .collect();
+
+        Tree {keys}
+    }
+
+    #[test]
+    fn test_sort() {
+        let t = tree();
+        println!("{:?}", t.iter().len());
+        assert!(false);
+    }
 
     #[test]
     fn test_linearize() {
-        assert!(true);
+        
     }
 
     #[test]
