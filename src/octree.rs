@@ -1,7 +1,7 @@
 // //! Data structures and functions to create regular and adaptive Octrees.
 
 use std::{
-    ops::Deref,
+    ops::{Deref, DerefMut},
     collections::{HashMap, HashSet}
 };
 
@@ -20,10 +20,8 @@ pub struct Tree {
 
 impl Tree {
 
+    /// Input must be sorted!
      pub fn linearize_keys(mut keys: Vec<MortonKey>) -> Vec<MortonKey> {
-
-        // To linearize the tree we first sort it.
-        keys.sort();
 
         let nkeys = keys.len();
 
@@ -92,6 +90,7 @@ impl Tree {
     }
 
     pub fn linearize(self: &mut Tree) {
+        self.keys.sort();
         self.keys = Tree::linearize_keys(self.keys.clone());
     }
 
@@ -108,6 +107,11 @@ impl Deref for Tree {
     }
 }
 
+impl DerefMut for Tree {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.keys
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -123,10 +127,9 @@ mod tests {
         point::Point,
     };
 
-    /// Tree fixture
-    fn tree () -> Tree {
+    fn tree_fixture () -> Tree {
         let ncrit: usize = 150;
-        let npoints: u64 = 10000;
+        let npoints: u64 = 1000;
 
         let domain = Domain{
             origin: [0., 0., 0.],
@@ -155,20 +158,35 @@ mod tests {
     }
 
     #[test]
-    fn test_sort() {
-        let t = tree();
-        println!("{:?}", t.iter().len());
-        assert!(false);
-    }
-
-    #[test]
     fn test_linearize() {
+        let mut tree = tree_fixture();
+        tree.linearize();
         
+        /// Test that a linearized tree is sorted
+        for i in 0..(tree.iter().len()-1) {
+            let a = tree[i];
+            let b = tree[i+1];
+            assert!(a <= b);
+        }
+
+        /// Test that elements in a linearized tree are unique
+        let unique: HashSet<MortonKey> = tree.iter().cloned().collect();
+        assert!(unique.len() == tree.len());
+
+        /// Test that a linearized tree contains no overlaps
+        let mut copy: Vec<MortonKey> = tree.keys.iter().cloned().collect();
+        for &key in tree.iter() { 
+            let ancestors = key.ancestors();
+            copy.retain(|&k| k != key);
+            
+            for ancestor in &ancestors {
+                assert!(!copy.contains(ancestor))
+            }
+        } 
     }
 
     #[test]
     fn test_complete() {
         assert!(true);
     }
-
 }
