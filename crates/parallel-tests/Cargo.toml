@@ -5,3 +5,5 @@ edition = "2021"
 
 [dependencies]
 rusty-tree = {path = "../rusty-tree"}
+mpi = { git = "https://github.com/rsmpi/rsmpi", branch = "main"}
+rand = "0.8.4"
