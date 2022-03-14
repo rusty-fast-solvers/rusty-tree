@@ -15,9 +15,7 @@ use hyksort::hyksort::hyksort as hyksort;
 
 use crate::{
     constants::ROOT,
-    octree::{
-        Tree, LinearTree
-    },
+    octree::Tree,
     types::{
         domain::Domain,
         morton::MortonKey,
@@ -31,7 +29,7 @@ pub fn complete_blocktree(
     &rank: &Rank,
     &size: &Rank,
     world: &UserCommunicator,
-) -> LinearTree {
+) -> Tree {
     if rank == 0 {
         let dfd_root = ROOT.finest_first_child();
         let min = seeds.iter().min().unwrap();
@@ -70,13 +68,13 @@ pub fn complete_blocktree(
     }
 
     // Complete region between seeds at each process
-    let mut local_blocktree = LinearTree{keys: Vec::new()};
+    let mut local_blocktree = Tree {keys: Vec::new()};
 
     for i in 0..(seeds.iter().len() - 1) {
         let a = seeds[i];
         let b = seeds[i + 1];
 
-        let mut tmp: Vec<MortonKey> = LinearTree::complete_region(&a, &b);
+        let mut tmp: Vec<MortonKey> = Tree::complete_region(&a, &b);
         local_blocktree.keys.push(a);
         local_blocktree.keys.append(&mut tmp);
     }
@@ -150,7 +148,7 @@ pub fn find_seeds(local_leaves: &Vec<MortonKey>) -> Vec<MortonKey> {
 
     // Complete the region between the least and greatest leaves.
 
-    let mut complete = LinearTree::complete_region(&min, &max);
+    let mut complete = Tree::complete_region(&min, &max);
     complete.push(min);
     complete.push(max);
 

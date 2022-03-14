@@ -35,8 +35,13 @@ fn main() {
 
     // Test ncrit
     {
+        use mpi::traits::*;
         use rusty_tree::types::morton::MortonKey;
         use std::collections::HashMap;
+
+        let world = universe.world();
+        let rank = world.rank();
+
         let mut blocks_to_points: HashMap<MortonKey, usize> = HashMap::new();
 
         for (_, block) in tree {
@@ -50,9 +55,18 @@ fn main() {
             }
         }
 
-        for (_, count) in blocks_to_points {
+        for (_, &count) in &blocks_to_points {
             assert!(count <= ncrit);
         }
+
+        if rank == 0 {
+            println!("blocks_{:?}=np.array([", rank);
+            for (block,_) in &blocks_to_points {
+                println!("    [{:?}, {:?}, {:?}, {:?}],",block.anchor[0], block.anchor[1], block.anchor[2], block.level());
+            }
+            println!("]) \n");
+        }
+
     }
 
 }

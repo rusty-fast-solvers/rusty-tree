@@ -225,6 +225,8 @@ impl MortonKey {
         let mut ancestors = HashSet::<MortonKey>::new();
 
         let mut current = self.clone();
+        
+        ancestors.insert(current);
 
         while current.level() > 0 {
             current = current.parent();
@@ -764,7 +766,7 @@ mod tests {
     use super::*;
     use rand::Rng;
 
-    use crate::serial_octree::{Tree, LinearTree};
+    use crate::octree::{Tree, LinearTree};
 
     /// Test the encoding table for the x-coordinate.
     #[test]
@@ -888,5 +890,56 @@ mod tests {
 
             assert!(less_than(&a, &b).unwrap() | (a == b));
         }
+    }
+
+    #[test]
+    fn test_find_children() {
+        let key = MortonKey {
+            morton: 0,
+            anchor: [0, 0, 0]
+        };
+        let displacement = 1 << (DEEPEST_LEVEL-key.level()-1);
+
+        let expected: Vec<MortonKey> = vec![
+            MortonKey{anchor: [0, 0, 0], morton: 1},
+            MortonKey{anchor: [displacement, 0, 0], morton: 0b100000000000000000000000000000000000000000000000000000000000001},
+            MortonKey{anchor: [0, displacement, 0], morton: 0b10000000000000000000000000000000000000000000000000000000000001},
+            MortonKey{anchor: [0, 0, displacement], morton: 0b1000000000000000000000000000000000000000000000000000000000001},
+            MortonKey{anchor: [displacement, displacement, 0], morton: 0b110000000000000000000000000000000000000000000000000000000000001},
+            MortonKey{anchor: [displacement, 0, displacement], morton: 0b101000000000000000000000000000000000000000000000000000000000001},
+            MortonKey{anchor: [0, displacement, displacement], morton: 0b11000000000000000000000000000000000000000000000000000000000001},
+            MortonKey{anchor: [displacement, displacement, displacement], morton: 0b111000000000000000000000000000000000000000000000000000000000001},
+        ];
+
+        let children = key.children();
+
+        for child in &children {
+            println!("child {:?} expected {:?}", child, expected);
+            assert!(expected.contains(child));
+        }
+    }
+
+    #[test]
+    fn test_ancestors() {
+        let domain: Domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.]
+        };
+        let point = [0.5, 0.5, 0.5];
+
+        let key = MortonKey::from_point(&point, &domain);
+
+        let mut ancestors: Vec<MortonKey> = key.ancestors().into_iter().collect();
+        ancestors.sort();
+
+        /// Test that all ancestors found
+        let mut current_level = 0;
+        for &ancestor in &ancestors {
+            assert!(ancestor.level() == current_level);
+            current_level += 1;
+        }
+
+        /// Test that the ancestors include the key at the leaf level
+        assert!(ancestors.contains(&key));
     }
 }
