@@ -180,7 +180,7 @@ mod tests {
     #[test]
     fn test_complete_region() {
         
-        let a: MortonKey = MortonKey { anchor: [0, 0, 0], morton: 0};
+        let a: MortonKey = MortonKey { anchor: [0, 0, 0], morton: 16};
         let b: MortonKey = MortonKey {anchor: [65535, 65535, 65535], morton: 0b111111111111111111111111111111111111111111111111000000000010000};
         
         let mut region = Tree::complete_region(&a, &b);
@@ -203,5 +203,22 @@ mod tests {
         /// Test that completed region doesn't contain its bounds
         assert!(!region.contains(&a));
         assert!(!region.contains(&b));
+
+        /// Test that the compeleted region doesn't contain any overlaps
+        for node in region.iter() {
+            let mut ancestors = node.ancestors();
+            ancestors.remove(node);
+            for ancestor in ancestors.iter() {
+                assert!(!region.contains(ancestor))
+            }
+        }
+
+        /// Test that the region is sorted
+        for i in 0..region.iter().len()-1 {
+            let a = region[i];
+            let b = region[i+1];
+
+            assert!(a <= b);
+        } 
     }
 }

@@ -14,15 +14,16 @@ use mpi::{
     }
 };
 
-use crate::types::{
-    domain::Domain,
-    point::PointType,
+use crate::{
+    constants::{
+        ROOT, DEEPEST_LEVEL, LEVEL_SIZE
+    },
+    types::{
+        domain::Domain,
+        point::PointType,
+    }
 };
 
-// #[from_env("DEEPEST_LEVEL")]
-pub const DEEPEST_LEVEL: KeyType = 16;
-pub const LEVEL_SIZE: KeyType = 1 << DEEPEST_LEVEL;
-pub const ROOT: MortonKey = MortonKey{anchor: [0, 0, 0], morton: 0};
 
 pub type KeyType = u64;
 
