@@ -59,13 +59,12 @@ fn main() {
             assert!(count <= ncrit);
         }
 
-        if rank == 0 {
+        if rank == 7 {
             println!("blocks_{:?}=np.array([", rank);
             for (block,_) in &blocks_to_points {
                 println!("    [{:?}, {:?}, {:?}, {:?}],",block.anchor[0], block.anchor[1], block.anchor[2], block.level());
             }
             println!("]) \n");
         }
-
     }
 }

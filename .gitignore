@@ -16,7 +16,9 @@ Cargo.lock
 # Lib
 *.so
 
+# Rust
 build_and_test.sh
 rusty_tree/rusty_tree/*
+/*/target/*
 
 .vscode/*

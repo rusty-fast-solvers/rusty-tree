@@ -35,7 +35,6 @@ pub fn complete_blocktree(
         let min = seeds.iter().min().unwrap();
         let na = dfd_root.finest_ancestor(&min);
         let first_child = na.children().into_iter().min().unwrap();
-        // println!("HERE {:?} {:?} {:?} {:?} : SEEDS {:?}", dfd_root, min, na, first_child, seeds);
         seeds.push(first_child);
         seeds.sort();
     }
@@ -147,20 +146,17 @@ pub fn find_seeds(local_leaves: &Vec<MortonKey>) -> Vec<MortonKey> {
     let max: MortonKey = local_leaves.iter().max().unwrap().clone();
 
     // Complete the region between the least and greatest leaves.
-
     let mut complete = Tree::complete_region(&min, &max);
     complete.push(min);
     complete.push(max);
 
     // Find blocks
-
     let coarsest_level = complete.iter().map(|k| k.level()).min().unwrap();
 
     let seeds: Vec<MortonKey> = complete
         .into_iter().filter(|k| k.level() == coarsest_level).collect();
 
     seeds
-
 }
 
 pub fn assign_blocks_to_points(
