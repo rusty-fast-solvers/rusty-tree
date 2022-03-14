@@ -15,16 +15,6 @@ pub struct Tree {
     pub keys: Vec<MortonKey>,
 }
 
-#[derive(Debug)]
-pub struct LinearTree {
-    pub keys: Vec<MortonKey>,
-}
-
-#[derive(Debug)]
-pub struct CompleteLinearTree {
-    pub keys: Vec<MortonKey>,
-}
-
 impl Tree {
     pub fn from_iterable<T: Iterator<Item = MortonKey>>(keys: T) -> Tree {
 
