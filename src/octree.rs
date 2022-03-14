@@ -59,7 +59,7 @@ impl Tree {
 
             for w in &working_list {
                 if ((a < w) & (w < b)) & !b_ancestors.contains(w) {
-                    aux_list.insert(*w);
+                    minimal_tree.push(*w);
                     len += 1;
                 } else if a_ancestors.contains(w) | b_ancestors.contains(w) {
                     for child in w.children() {
@@ -69,7 +69,7 @@ impl Tree {
             }
 
             if len == working_list.len() {
-                minimal_tree = aux_list.into_iter().collect();
+                // minimal_tree = aux_list.into_iter().collect();
                 break;
             } else {
                 working_list = aux_list;
@@ -182,11 +182,33 @@ mod tests {
             for ancestor in &ancestors {
                 assert!(!copy.contains(ancestor))
             }
-        } 
+        }
     }
 
     #[test]
-    fn test_complete() {
-        assert!(true);
+    fn test_complete_region() {
+        
+        let a: MortonKey = MortonKey { anchor: [0, 0, 0], morton: 0};
+        let b: MortonKey = MortonKey {anchor: [65535, 65535, 65535], morton: 0b111111111111111111111111111111111111111111111111000000000010000};
+        
+        // println!("dld {:?} dfd {:?}", a.finest_last_child(), a.finest_first_child());
+        // assert!(false);
+        // println!("finst ancestors {:?}", a.finest_ancestor(&b));
+        let mut result = Tree::complete_region(&a, &b);
+        // let fa = a.finest_ancestor(&b);
+
+        // let min = result.iter().min().unwrap();
+        // let max = result.iter().max().unwrap();
+
+        // Test that bounds are satisfied
+        // println!("a {:?} min {:?}", a, min);
+        // assert!(a <= *min);
+        // assert!(b >= *max);
+
+        // // Test that FCA is an ancestor of all nodes in the result
+        // for node in result.iter() {
+        //     let ancestors = find_ancestors(&node, &depth);
+        //     assert!(ancestors.contains(&fca));
+        // }
     }
 }

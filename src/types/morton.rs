@@ -176,12 +176,20 @@ impl MortonKey {
 
     /// Return the last child on the deepest level
     pub fn finest_last_child(&self) -> Self {
-        let morton = self.morton >> LEVEL_DISPLACEMENT;
-        let nlevels = DEEPEST_LEVEL - self.level();
-        let mask: KeyType = (1 << 3 * nlevels) - 1;
-        let morton = morton | mask;
-        MortonKey::from_morton(morton + DEEPEST_LEVEL)
-    }
+        if self.level() < DEEPEST_LEVEL {
+            let mut level_diff = DEEPEST_LEVEL - self.level();
+            let mut flc = self.children().iter().max().unwrap().clone();
+    
+            while level_diff > 1 {
+                let tmp = flc;
+                flc = tmp.children().iter().max().unwrap().clone();
+                level_diff -= 1;
+            }
+    
+            flc
+        } else {
+            self.clone()
+        }}
 
     /// Return all children in order of their Morton indices
     pub fn children(&self) -> Vec<MortonKey> {
@@ -935,5 +943,22 @@ mod tests {
 
         /// Test that the ancestors include the key at the leaf level
         assert!(ancestors.contains(&key));
+    }
+
+    #[test]
+    pub fn test_finest_ancestor() {
+        /// Trivial case
+        let key: MortonKey = MortonKey { anchor: [0, 0, 0], morton: 0};
+        let result = key.finest_ancestor(&key);
+        let expected : MortonKey = MortonKey { anchor: [0, 0, 0], morton: 0};
+        assert!(result == expected);
+
+        /// Standard case
+        let displacement = 1 << (DEEPEST_LEVEL-key.level()-1);
+        let a: MortonKey = MortonKey { anchor: [0, 0, 0], morton: 16};
+        let b: MortonKey = MortonKey {anchor: [displacement, displacement, displacement], morton: 0b111000000000000000000000000000000000000000000000000000000000001};
+        let result = a.finest_ancestor(&b);
+        let expected : MortonKey = MortonKey { anchor: [0, 0, 0], morton: 0};
+        assert!(result == expected);
     }
 }
