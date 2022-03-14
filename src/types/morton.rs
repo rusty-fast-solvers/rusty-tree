@@ -766,7 +766,7 @@ mod tests {
     use super::*;
     use rand::Rng;
 
-    use crate::octree::{Tree, LinearTree};
+    use crate::octree::Tree;
 
     /// Test the encoding table for the x-coordinate.
     #[test]

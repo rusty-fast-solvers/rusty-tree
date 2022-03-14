@@ -53,8 +53,6 @@ impl Tree {
         new_keys
     }
 
-
-
     pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
         // let mut region = Vec::<Key>::new();
         // let mut work_set = a.finest_ancestor(&b).children();
@@ -106,6 +104,24 @@ impl Tree {
         let keys: Vec<MortonKey> = self.keys.iter().copied().collect::<Vec<MortonKey>>();
 
         Tree { keys: Tree::linearize_keys(keys) }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::Rng;
+
+    use crate::octree::Tree;
+
+    #[test]
+    fn test_linearize() {
+        assert!(true);
+    }
+
+    #[test]
+    fn test_complete() {
+        assert!(true);
     }
 
 }
