@@ -2,6 +2,10 @@
 name = "parallel-tests"
 version = "0.1.0"
 edition = "2021"
+authors = ["Timo Betcke <timo.betcke@gmail.com>", "Srinath Kailasa <srinathkailasa@gmail.com>"]
+edition = "2018"
+description = "Tests for MPI functionality in `rusty-tree`"
+license = "BSD-3-Clause"
 
 [dependencies]
 rusty-tree = {path = "../rusty-tree"}
