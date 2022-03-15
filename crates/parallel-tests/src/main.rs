@@ -1,23 +1,25 @@
 use std::collections::HashMap;
 
-use mpi::traits::*;
-use mpi::topology::{Rank};
+use mpi::{
+    traits::*,
+    topology::Rank,
+    environment::Universe,
+};
 
 use rand::prelude::*;
 use rand::{SeedableRng};
 
 use rusty_tree::{
+    constants::NCRIT,
     distribute::unbalanced_tree,
-    octree::Tree,
     types::{
         domain::Domain,
-        point::Point,
         morton::MortonKey,
     }
 };
 
 
-pub fn points_fixture() -> Vec<[f64; 3]> {
+fn points_fixture() -> Vec<[f64; 3]> {
     let npoints: u64 = 10000;
 
     let mut range = StdRng::seed_from_u64(0);
@@ -30,26 +32,25 @@ pub fn points_fixture() -> Vec<[f64; 3]> {
     points
 }
 
-pub fn test_ncrit() {
-    
-    // 0. Experimental Parameters
-    let ncrit: usize = 150;
+fn unbalanced_tree_fixture(universe: &Universe) -> HashMap<MortonKey, MortonKey> {
+
+    // Experimental Parameters
     let k: Rank = 2;
-    
-    let universe = mpi::initialize().unwrap();
-    let world = universe.world();
-    let rank = world.rank();
     let domain = Domain{
         origin: [0., 0., 0.],
         diameter: [1., 1., 1.]
     };
-    
+
     let points = points_fixture();
 
-    let tree = unbalanced_tree(
-        &ncrit, &universe, points, &domain, k
-    );
-    
+    unbalanced_tree(&universe, points, &domain)
+
+}
+
+fn test_ncrit(universe: &Universe) {
+
+    let tree = unbalanced_tree_fixture(universe);
+
     let mut blocks_to_points: HashMap<MortonKey, usize> = HashMap::new();
 
     for (_, block) in tree {
@@ -64,21 +65,23 @@ pub fn test_ncrit() {
     }
 
     for (_, &count) in &blocks_to_points {
-        assert!(count <= ncrit);
-    }    
+        assert!(count <= NCRIT);
+    }
 }
 
 
-pub fn test_span() {
+fn test_span(universe: &Universe) {
     assert!(true)
 }
 
 
 fn main() {
 
-    /// Test that the final tree satisfies the ncrit bound
-    test_ncrit();
+    let universe = mpi::initialize().unwrap();
 
-    /// Test that the final tree spans the entire space defined by the particle distribution.
-    test_span();
+    // Test that the final tree satisfies the ncrit bound
+    test_ncrit(&universe);
+
+    // Test that the final tree spans the entire space defined by the particle distribution.
+    test_span(&universe);
 }

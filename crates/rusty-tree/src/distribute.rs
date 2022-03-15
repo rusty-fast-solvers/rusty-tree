@@ -1,20 +1,15 @@
 use std::collections::{HashSet, HashMap};
 
 use mpi::{
-    Address,
-    datatype::{
-        Equivalence, UncommittedUserDatatype, UserDatatype
-    },
     topology::{Color, Rank, UserCommunicator},
     environment::Universe,
     traits::*
 };
-use memoffset::offset_of;
 
 use hyksort::hyksort::hyksort as hyksort;
 
 use crate::{
-    constants::ROOT,
+    constants::{ROOT, NCRIT, K},
     octree::Tree,
     types::{
         domain::Domain,
@@ -187,7 +182,6 @@ pub fn assign_blocks_to_points(
 pub fn split_blocks(
     leaves: &Vec<MortonKey>,
     mut blocktree: Vec<MortonKey>,
-    &ncrit: &usize
 ) -> HashMap<MortonKey, MortonKey> {
 
     let mut refined = false;
@@ -215,7 +209,7 @@ pub fn split_blocks(
 
         let mut check = 0;
         for (&block, &npoints) in blocks_to_points.iter() {
-            if npoints > ncrit {
+            if npoints > NCRIT {
                 let mut children = block.children();
                 new_blocktree.append(&mut children);
             } else {
@@ -242,11 +236,9 @@ pub fn split_blocks(
 
 
 pub fn unbalanced_tree(
-    &ncrit: &usize,
     universe: &Universe,
     points: Vec<[PointType; 3]>,
     domain: &Domain,
-    k: Rank,
 ) -> HashMap<MortonKey, MortonKey>{
 
     let comm = universe.world();
@@ -262,7 +254,7 @@ pub fn unbalanced_tree(
         .collect();
 
     // 2.i Perform parallel Morton sort over encoded points
-    hyksort(&mut points, k, &mut comm);
+    hyksort(&mut points, K, &mut comm);
 
     // // 2.ii, find unique leaves on each processor
     let leaves: Vec<MortonKey> = points
@@ -324,5 +316,5 @@ pub fn unbalanced_tree(
     leaves.linearize();
 
     // 6. Refine blocks based on ncrit
-    split_blocks(&leaves.keys, blocktree.keys, &ncrit)
+    split_blocks(&leaves.keys, blocktree.keys)
 }
