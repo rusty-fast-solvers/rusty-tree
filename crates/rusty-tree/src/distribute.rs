@@ -235,23 +235,43 @@ pub fn split_blocks(
     points_to_blocks
 }
 
-// pub fn balance(tree: &HashMap<MortonKey, MortonKey>) {
 
-//     let mut balanced: HashSet<MortonKey> = tree.iter().map(|(key,_)| key).cloned().collect();
+/// Balance a tree, and remove overlaps
+pub fn balance(tree: &HashMap<MortonKey, MortonKey>) -> Tree {
 
-//     for level in (0..DEEPEST_LEVEL).rev() {
-//         let work_list: Vec<MortonKey> = tree
-//             .iter()
-//             .filter(|(key, _)| key.level() == level)
-//             .map(|(key, _)| key)
-//             .cloned()
-//             .collect();
+    let mut balanced: HashSet<MortonKey> = tree.iter().map(|(key,_)| key).cloned().collect();
 
-//         for key in work_list {
-//             let neighbours = key.find_key_in_direction()
-//         }
-//         }
-// }
+    for level in (0..DEEPEST_LEVEL).rev() {
+        let work_list: Vec<MortonKey> = tree
+            .iter()
+            .filter(|(key, _)| key.level() == level)
+            .map(|(key, _)| key)
+            .cloned()
+            .collect();
+
+        for key in work_list {
+            let neighbors = key.neighbors();
+
+            for neighbor in neighbors {
+                let parent = neighbor.parent();
+                if !balanced.contains(&neighbor) && !balanced.contains(&neighbor) {
+                    balanced.insert(parent);
+
+                    if parent.level() > 0 {
+                        for sibling in parent.siblings() {
+                            balanced.insert(sibling);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let mut balanced: Vec<MortonKey> = balanced.into_iter().collect();
+    balanced.sort();
+    let linearized = Tree::linearize_keys(balanced);
+    Tree{keys: linearized}
+}
 
 
 pub fn unbalanced_tree(
@@ -392,9 +412,17 @@ pub fn balanced_tree(
     // 6. Refine blocks based on ncrit
     let unbalanced_tree = split_blocks(&leaves.keys, blocktree.keys);
 
-    // 2. Create the minimal balanced tree for local octants, spanning the entire domain
+    // 7.i Create the minimal balanced tree for local octants, spanning the entire domain, and linearize
+    let linearized = balance(&unbalanced_tree);
 
-    // 3. Perform another sort
+    // 7.ii Assign the local points to the elements of this new balanced tree
+    let points_to_blocks = assign_blocks_to_points(
+        &leaves.keys,
+        linearized.keys,
+    );
 
-    // 4. Remove local overlaps
+
+    // 8. Perform another distributed sort
+
+    // 9. Remove local overlaps
 }

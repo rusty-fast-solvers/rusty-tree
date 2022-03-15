@@ -2,14 +2,13 @@
 
 use std::{
     ops::{Deref, DerefMut},
-    collections::{HashMap, HashSet}
+    collections::{HashSet}
 };
 
 use itertools::Itertools;
 
 use crate::{
-    constants::DEEPEST_LEVEL,
-    types::morton::{MortonKey, KeyType}
+    types::morton::{MortonKey}
 };
 
 
@@ -21,7 +20,7 @@ pub struct Tree {
 impl Tree {
 
     /// Input must be sorted!
-     pub fn linearize_keys(mut keys: Vec<MortonKey>) -> Vec<MortonKey> {
+     pub fn linearize_keys(keys: Vec<MortonKey>) -> Vec<MortonKey> {
 
         let nkeys = keys.len();
 
@@ -121,7 +120,6 @@ mod tests {
     };
 
     fn tree_fixture () -> Tree {
-        let ncrit: usize = 150;
         let npoints: u64 = 1000;
 
         let domain = Domain{
@@ -137,7 +135,7 @@ mod tests {
             points.push([between.sample(&mut range), between.sample(&mut range), between.sample(&mut range)])
         }
 
-        let mut points: Vec<Point> = points
+        let points: Vec<Point> = points
         .iter()
         .map(|p| Point{coordinate: p.clone(), global_idx: 0, key: MortonKey::from_point(&p, &domain)})
         .collect();
@@ -155,18 +153,18 @@ mod tests {
         let mut tree = tree_fixture();
         tree.linearize();
 
-        /// Test that a linearized tree is sorted
+        // Test that a linearized tree is sorted
         for i in 0..(tree.iter().len()-1) {
             let a = tree[i];
             let b = tree[i+1];
             assert!(a <= b);
         }
 
-        /// Test that elements in a linearized tree are unique
+        // Test that elements in a linearized tree are unique
         let unique: HashSet<MortonKey> = tree.iter().cloned().collect();
         assert!(unique.len() == tree.len());
 
-        /// Test that a linearized tree contains no overlaps
+        // Test that a linearized tree contains no overlaps
         let mut copy: Vec<MortonKey> = tree.keys.iter().cloned().collect();
         for &key in tree.iter() {
             let ancestors = key.ancestors();
@@ -184,28 +182,28 @@ mod tests {
         let a: MortonKey = MortonKey { anchor: [0, 0, 0], morton: 16};
         let b: MortonKey = MortonKey {anchor: [65535, 65535, 65535], morton: 0b111111111111111111111111111111111111111111111111000000000010000};
 
-        let mut region = Tree::complete_region(&a, &b);
+        let region = Tree::complete_region(&a, &b);
 
         let fa = a.finest_ancestor(&b);
 
         let min = region.iter().min().unwrap();
         let max = region.iter().max().unwrap();
 
-        /// Test that bounds are satisfied
+        // Test that bounds are satisfied
         assert!(a <= *min);
         assert!(b >= *max);
 
-        /// Test that FCA is an ancestor of all nodes in the result
+        // Test that FCA is an ancestor of all nodes in the result
         for node in region.iter() {
             let ancestors = node.ancestors();
             assert!(ancestors.contains(&fa));
         }
 
-        /// Test that completed region doesn't contain its bounds
+        // Test that completed region doesn't contain its bounds
         assert!(!region.contains(&a));
         assert!(!region.contains(&b));
 
-        /// Test that the compeleted region doesn't contain any overlaps
+        // Test that the compeleted region doesn't contain any overlaps
         for node in region.iter() {
             let mut ancestors = node.ancestors();
             ancestors.remove(node);
@@ -214,7 +212,7 @@ mod tests {
             }
         }
 
-        /// Test that the region is sorted
+        // Test that the region is sorted
         for i in 0..region.iter().len()-1 {
             let a = region[i];
             let b = region[i+1];
