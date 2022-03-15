@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use mpi::{
     traits::*,
@@ -10,7 +10,7 @@ use rand::prelude::*;
 use rand::{SeedableRng};
 
 use rusty_tree::{
-    constants::NCRIT,
+    constants::{NCRIT, ROOT},
     distribute::unbalanced_tree,
     types::{
         domain::Domain,
@@ -18,15 +18,16 @@ use rusty_tree::{
     }
 };
 
+const NPOINTS: u64 = 100000;
+
 
 fn points_fixture() -> Vec<[f64; 3]> {
-    let npoints: u64 = 10000;
 
     let mut range = StdRng::seed_from_u64(0);
     let between = rand::distributions::Uniform::from(0.0..1.0);
     let mut points = Vec::new();
 
-    for _ in 0..npoints {
+    for _ in 0..NPOINTS {
         points.push([between.sample(&mut range), between.sample(&mut range), between.sample(&mut range)])
     }
     points
@@ -47,9 +48,9 @@ fn unbalanced_tree_fixture(universe: &Universe) -> HashMap<MortonKey, MortonKey>
 
 }
 
-fn test_ncrit(universe: &Universe) {
 
-    let tree = unbalanced_tree_fixture(universe);
+/// Test that the tree satisfies the ncrit condition.
+fn test_ncrit(tree: &HashMap<MortonKey, MortonKey>) {
 
     let mut blocks_to_points: HashMap<MortonKey, usize> = HashMap::new();
 
@@ -70,8 +71,43 @@ fn test_ncrit(universe: &Universe) {
 }
 
 
-fn test_span(universe: &Universe) {
-    assert!(true)
+/// Test that the tree spans the entire domain specified by the point distribution.
+fn test_span(tree: &HashMap<MortonKey, MortonKey>) {
+
+    let min = tree.iter().map(|(_, block)| block).min().unwrap();
+    let max = tree.iter().map(|(_, block)| block).max().unwrap();
+    let block_set: HashSet<MortonKey> = tree.iter().map(|(_, block)| block.clone()).collect();
+    let max_level = tree.iter().map(|(_, block)| block.level()).max().unwrap();
+
+    // Generate a uniform tree at the max level, and filter for range in this processor
+    let mut level = 0;
+    let mut uniform = vec![ROOT.clone()];
+    while level < max_level {
+
+        let mut descendents: Vec<MortonKey> = Vec::new();
+
+        for node in uniform.iter() {
+            let mut children = node.children();
+            descendents.append(&mut children);
+        }
+
+        uniform = descendents;
+
+        level += 1;
+    }
+
+    uniform = uniform.into_iter().filter(|node| min <= node && node <= max).collect();
+
+    // Test that each member of the uniform tree, or it's their ancestors are contained within the
+    // tree.
+    for node in uniform.iter() {
+        let ancestors = node.ancestors();
+
+        let int: Vec<MortonKey> = ancestors.intersection(&block_set).into_iter().cloned().collect();
+
+        assert!(int.iter().len() >= 1);
+
+    }
 }
 
 
@@ -79,9 +115,17 @@ fn main() {
 
     let universe = mpi::initialize().unwrap();
 
-    // Test that the final tree satisfies the ncrit bound
-    test_ncrit(&universe);
+    // Distribute Trees
+    let unbalanced = unbalanced_tree_fixture(&universe);
 
-    // Test that the final tree spans the entire space defined by the particle distribution.
-    test_span(&universe);
+    // Tests for the unbalanced tree
+    {
+        test_ncrit(&unbalanced);
+        test_span(&unbalanced);
+    }
+
+    // Tests for the balanced tree
+    {
+        assert!(true);
+    }
 }

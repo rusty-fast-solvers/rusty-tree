@@ -16,7 +16,7 @@ use mpi::{
 
 use crate::{
     constants::{
-        ROOT, DEEPEST_LEVEL, LEVEL_SIZE
+        DEEPEST_LEVEL, LEVEL_SIZE
     },
     types::{
         domain::Domain,
@@ -180,13 +180,13 @@ impl MortonKey {
         if self.level() < DEEPEST_LEVEL {
             let mut level_diff = DEEPEST_LEVEL - self.level();
             let mut flc = self.children().iter().max().unwrap().clone();
-    
+
             while level_diff > 1 {
                 let tmp = flc;
                 flc = tmp.children().iter().max().unwrap().clone();
                 level_diff -= 1;
             }
-    
+
             flc
         } else {
             self.clone()
@@ -234,7 +234,7 @@ impl MortonKey {
         let mut ancestors = HashSet::<MortonKey>::new();
 
         let mut current = self.clone();
-        
+
         ancestors.insert(current);
 
         while current.level() > 0 {
@@ -885,7 +885,7 @@ mod tests {
         keys.sort();
         let mut tree = Tree{keys};
         tree.linearize();
-        
+
         /// Test that Z order is maintained when sorted
         for i in 0..(tree.keys.len() - 1) {
             let a = tree.keys[i];
