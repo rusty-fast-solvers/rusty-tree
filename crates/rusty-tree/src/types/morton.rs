@@ -354,7 +354,7 @@ impl MortonKey {
         DIRECTIONS
             .iter()
             .map(|d| self.find_key_in_direction(d))
-            // .filter(|d| !d.is_none())
+            .filter(|d| !d.is_none())
             .map(|d| d.unwrap())
             .collect()
     }

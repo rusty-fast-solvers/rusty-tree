@@ -8,6 +8,7 @@ use std::{
 use itertools::Itertools;
 
 use crate::{
+    constants::DEEPEST_LEVEL,
     types::morton::{MortonKey}
 };
 
@@ -88,6 +89,41 @@ impl Tree {
 
     pub fn sort(self: &mut Tree) {
         self.keys.sort();
+    }
+
+    /// Balance a tree, and remove overlaps
+    pub fn balance(&self) -> Tree {
+
+        let mut balanced: Vec<MortonKey> = self.keys.iter().cloned().collect();
+
+        for level in (0..DEEPEST_LEVEL).rev() {
+            let work_list: Vec<MortonKey> = self
+                .iter()
+                .filter(|key| key.level() == level)
+                .cloned()
+                .collect();
+
+            for key in work_list {
+                let neighbors = key.neighbors();
+
+                for neighbor in neighbors {
+                    let parent = neighbor.parent();
+                    if !balanced.contains(&neighbor) && !balanced.contains(&neighbor) {
+                        balanced.push(parent);
+
+                        if parent.level() > 0 {
+                            for sibling in parent.siblings() {
+                                balanced.push(sibling);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        balanced.sort();
+        let linearized = Tree::linearize_keys(balanced);
+        Tree{keys: linearized}
     }
 }
 

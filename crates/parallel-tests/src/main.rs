@@ -11,14 +11,17 @@ use rand::{SeedableRng};
 
 use rusty_tree::{
     constants::{NCRIT, ROOT},
-    distribute::unbalanced_tree,
+    distribute::{
+        unbalanced_tree,
+        balanced_tree
+    },
     types::{
         domain::Domain,
         morton::MortonKey,
     }
 };
 
-const NPOINTS: u64 = 100000;
+const NPOINTS: u64 = 10000;
 
 
 fn points_fixture() -> Vec<[f64; 3]> {
@@ -48,6 +51,20 @@ fn unbalanced_tree_fixture(universe: &Universe) -> HashMap<MortonKey, MortonKey>
 
 }
 
+fn balanced_tree_fixture(universe: &Universe) -> HashMap<MortonKey, MortonKey> {
+
+    // Experimental Parameters
+    let k: Rank = 2;
+    let domain = Domain{
+        origin: [0., 0., 0.],
+        diameter: [1., 1., 1.]
+    };
+
+    let points = points_fixture();
+
+    balanced_tree(&universe, points, &domain)
+
+}
 
 /// Test that the tree satisfies the ncrit condition.
 fn test_ncrit(tree: &HashMap<MortonKey, MortonKey>) {
@@ -106,7 +123,6 @@ fn test_span(tree: &HashMap<MortonKey, MortonKey>) {
         let int: Vec<MortonKey> = ancestors.intersection(&block_set).into_iter().cloned().collect();
 
         assert!(int.iter().len() >= 1);
-
     }
 }
 
@@ -114,9 +130,11 @@ fn test_span(tree: &HashMap<MortonKey, MortonKey>) {
 fn main() {
 
     let universe = mpi::initialize().unwrap();
+    let world = universe.world(); let rank = world.rank();
 
     // Distribute Trees
     let unbalanced = unbalanced_tree_fixture(&universe);
+    let balanced = balanced_tree_fixture(&universe);
 
     // Tests for the unbalanced tree
     {
@@ -126,6 +144,10 @@ fn main() {
 
     // Tests for the balanced tree
     {
-        assert!(true);
+        test_ncrit(&balanced);
+        test_span(&balanced);
     }
+
+    println!("rank {:?} balanced {:?} unbalanced {:?}", rank, balanced.len(), unbalanced.len());
+    // assert!(false)
 }

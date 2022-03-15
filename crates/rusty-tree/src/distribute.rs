@@ -236,44 +236,6 @@ pub fn split_blocks(
 }
 
 
-/// Balance a tree, and remove overlaps
-pub fn balance(tree: &HashMap<MortonKey, MortonKey>) -> Tree {
-
-    let mut balanced: HashSet<MortonKey> = tree.iter().map(|(key,_)| key).cloned().collect();
-
-    for level in (0..DEEPEST_LEVEL).rev() {
-        let work_list: Vec<MortonKey> = tree
-            .iter()
-            .filter(|(key, _)| key.level() == level)
-            .map(|(key, _)| key)
-            .cloned()
-            .collect();
-
-        for key in work_list {
-            let neighbors = key.neighbors();
-
-            for neighbor in neighbors {
-                let parent = neighbor.parent();
-                if !balanced.contains(&neighbor) && !balanced.contains(&neighbor) {
-                    balanced.insert(parent);
-
-                    if parent.level() > 0 {
-                        for sibling in parent.siblings() {
-                            balanced.insert(sibling);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    let mut balanced: Vec<MortonKey> = balanced.into_iter().collect();
-    balanced.sort();
-    let linearized = Tree::linearize_keys(balanced);
-    Tree{keys: linearized}
-}
-
-
 pub fn unbalanced_tree(
     universe: &Universe,
     points: Vec<[PointType; 3]>,
@@ -347,7 +309,7 @@ pub fn balanced_tree(
     universe: &Universe,
     points: Vec<[PointType; 3]>,
     domain: &Domain,
-) {
+) -> HashMap<MortonKey, MortonKey> {
 
     // Create a distributed unbalanced tree;
     let comm = universe.world();
@@ -406,23 +368,50 @@ pub fn balanced_tree(
         .map(|p| p.key)
         .collect();
 
-    let mut leaves = Tree{keys};
-    leaves.linearize();
+    let leaves = Tree{keys};
 
     // 6. Refine blocks based on ncrit
     let unbalanced_tree = split_blocks(&leaves.keys, blocktree.keys);
 
     // 7.i Create the minimal balanced tree for local octants, spanning the entire domain, and linearize
-    let linearized = balance(&unbalanced_tree);
+    let linearized = Tree {
+        keys: unbalanced_tree.into_iter().map(|(_, block)| block).collect()
+    };
+
+    linearized.balance();
 
     // 7.ii Assign the local points to the elements of this new balanced tree
-    let points_to_blocks = assign_blocks_to_points(
+    let points_to_balanced = assign_blocks_to_points(
         &leaves.keys,
         linearized.keys,
     );
 
+    let mut points: Vec<Point> = points
+        .iter()
+        .map(|p| Point{
+            coordinate: p.coordinate,
+            global_idx: p.global_idx,
+            key: points_to_balanced.get(&p.key).unwrap().clone()
+        })
+        .collect();
 
     // 8. Perform another distributed sort
+    let comm = universe.world();
+    let mut comm = comm.split_by_color(Color::with_value(0)).unwrap();
+    hyksort(&mut points, K, &mut comm);
 
     // 9. Remove local overlaps
+    let keys: Vec<MortonKey> = points
+        .iter()
+        .map(|p| p.key)
+        .collect();
+
+    let mut tree = Tree{keys};
+    tree.linearize();
+
+    // 10. Map points to non-overlapping tree
+    assign_blocks_to_points(
+        &points.iter().map(|p| p.key).collect(),
+        tree.keys,
+    )
 }

@@ -2,7 +2,6 @@
 use mpi::topology::Rank;
 use  crate::types::morton::{KeyType, MortonKey};
 
-
 pub const K: Rank = 2;
 
 pub const NCRIT: usize = 150;
