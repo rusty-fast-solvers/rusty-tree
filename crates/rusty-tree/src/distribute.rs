@@ -247,7 +247,6 @@ pub fn unbalanced_tree(
     let size = comm.size();
 
     // 1. Encode Points to Leaf Morton Keys
-    // Map between points and keys
     let mut points: Vec<Point> = points
         .iter()
         .map(|p| Point{coordinate: p.clone(), global_idx: 0, key: MortonKey::from_point(&p, &domain)})
@@ -256,7 +255,7 @@ pub fn unbalanced_tree(
     // 2.i Perform parallel Morton sort over encoded points
     hyksort(&mut points, K, &mut comm);
 
-    // // 2.ii, find unique leaves on each processor
+    // 2.ii, find unique leaves on each processor
     let leaves: Vec<MortonKey> = points
         .iter()
         .map(|p| p.key)
@@ -295,7 +294,6 @@ pub fn unbalanced_tree(
         &size,
         &comm
     );
-
     blocktree.sort();
 
     // 5.ii any data below the min seed sent to partner process
@@ -317,4 +315,20 @@ pub fn unbalanced_tree(
 
     // 6. Refine blocks based on ncrit
     split_blocks(&leaves.keys, blocktree.keys)
+}
+
+pub fn balanced_tree(
+    universe: &Universe,
+    points: Vec<[PointType; 3]>,
+    domain: &Domain,
+) {
+
+    // 1. Create a distributed unbalanced tree;
+    let unbalanced = unbalanced_tree(universe, points, domain);
+
+    // 2. Create the minimal balanced tree for local octants, spanning the entire domain
+
+    // 3. Perform another sort
+
+    // 4. Remove local overlaps
 }

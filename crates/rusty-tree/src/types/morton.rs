@@ -29,20 +29,11 @@ pub type KeyType = u64;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
-pub struct Point {
-    pub coordinate: [PointType; 3],
-    pub morton: MortonKey,
-}
-
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
 /// Representation of a Morton key.
 pub struct MortonKey {
     pub anchor: [KeyType; 3],
     pub morton: KeyType,
 }
-
 
 unsafe impl Equivalence for MortonKey {
     type Out = UserDatatype;
@@ -61,41 +52,6 @@ unsafe impl Equivalence for MortonKey {
     }
 }
 
-unsafe impl Equivalence for Point {
-    type Out = UserDatatype;
-    fn equivalent_datatype() -> Self::Out {
-        UserDatatype::structured(
-            &[1, 1],
-            &[
-                offset_of!(Point, coordinate) as Address,
-                offset_of!(Point, morton) as Address,
-            ],
-            &[
-                UncommittedUserDatatype::contiguous(3, &PointType::equivalent_datatype()).as_ref(),
-                UncommittedUserDatatype::structured(
-                    &[1, 1],
-                    &[
-                        offset_of!(MortonKey, anchor) as Address,
-                        offset_of!(MortonKey, morton) as Address
-                    ],
-                    &[
-                        UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype()).as_ref(),
-                        UncommittedUserDatatype::contiguous(1, &KeyType::equivalent_datatype()).as_ref(),
-                    ]
-                ).as_ref()
-            ]
-        )
-    }
-}
-
-impl Default for Point {
-    fn default() -> Self {
-        Point {
-            coordinate: [PointType::default(), PointType::default(), PointType::default()],
-            morton: MortonKey::default(),
-        }
-    }
-}
 
 impl Default for MortonKey {
     fn default() -> Self {
@@ -396,29 +352,13 @@ impl PartialEq for MortonKey {
     }
 }
 
-impl PartialEq for Point {
-    fn eq(&self, other: &Self) -> bool {
-        self.morton == other.morton
-    }
-}
-
 impl Eq for MortonKey {}
-
-impl Eq for Point {}
-
 
 impl Ord for MortonKey {
     fn cmp(&self, other: &Self) -> Ordering {
         self.morton.cmp(&other.morton)
     }
 }
-
-impl Ord for Point {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.morton.cmp(&other.morton)
-    }
-}
-
 
 impl PartialOrd for MortonKey {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -427,22 +367,9 @@ impl PartialOrd for MortonKey {
     }
 }
 
-impl PartialOrd for Point {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        // less_than(&self.morton, &other.morton)
-        Some(self.morton.morton.cmp(&other.morton.morton))
-    }
-}
-
 impl Hash for MortonKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.morton.hash(state);
-    }
-}
-
-impl Hash for Point {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.morton.morton.hash(state);
     }
 }
 
