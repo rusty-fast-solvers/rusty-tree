@@ -9,7 +9,7 @@ use mpi::{
 use hyksort::hyksort::hyksort as hyksort;
 
 use crate::{
-    constants::{ROOT, NCRIT, K},
+    constants::{ROOT, NCRIT, K, DEEPEST_LEVEL},
     octree::Tree,
     types::{
         domain::Domain,
@@ -77,7 +77,7 @@ pub fn complete_blocktree(
         local_blocktree.keys.push(seeds.last().unwrap().clone());
     }
 
-    local_blocktree.keys.sort();
+    local_blocktree.sort();
     local_blocktree
 }
 
@@ -148,9 +148,10 @@ pub fn find_seeds(local_leaves: &Vec<MortonKey>) -> Vec<MortonKey> {
     // Find blocks
     let coarsest_level = complete.iter().map(|k| k.level()).min().unwrap();
 
-    let seeds: Vec<MortonKey> = complete
+    let mut seeds: Vec<MortonKey> = complete
         .into_iter().filter(|k| k.level() == coarsest_level).collect();
 
+    seeds.sort();
     seeds
 }
 
@@ -234,6 +235,24 @@ pub fn split_blocks(
     points_to_blocks
 }
 
+// pub fn balance(tree: &HashMap<MortonKey, MortonKey>) {
+
+//     let mut balanced: HashSet<MortonKey> = tree.iter().map(|(key,_)| key).cloned().collect();
+
+//     for level in (0..DEEPEST_LEVEL).rev() {
+//         let work_list: Vec<MortonKey> = tree
+//             .iter()
+//             .filter(|(key, _)| key.level() == level)
+//             .map(|(key, _)| key)
+//             .cloned()
+//             .collect();
+
+//         for key in work_list {
+//             let neighbours = key.find_key_in_direction()
+//         }
+//         }
+// }
+
 
 pub fn unbalanced_tree(
     universe: &Universe,
@@ -246,55 +265,42 @@ pub fn unbalanced_tree(
     let rank = comm.rank();
     let size = comm.size();
 
-    // 1. Encode Points to Leaf Morton Keys
+    // 1. Encode Points to Leaf Morton Keys, add a global index related to the processor
     let mut points: Vec<Point> = points
         .iter()
-        .map(|p| Point{coordinate: p.clone(), global_idx: 0, key: MortonKey::from_point(&p, &domain)})
+        .enumerate()
+        .map(|(i, p)| Point{coordinate: p.clone(), global_idx: i, key: MortonKey::from_point(&p, &domain)})
         .collect();
 
     // 2.i Perform parallel Morton sort over encoded points
     hyksort(&mut points, K, &mut comm);
 
-    // 2.ii, find unique leaves on each processor
-    let leaves: Vec<MortonKey> = points
+    // 2.ii Find unique leaf keys on each processor and place in a Tree
+    let keys: Vec<MortonKey> = points
         .iter()
         .map(|p| p.key)
         .collect();
 
-    let mut leaves = Tree {keys: leaves};
-    leaves.linearize();
-    leaves.sort();
+    let mut tree = Tree {keys};
+
+    // 3. Linearise received keys (remove overlaps if they exist).
+    tree.linearize();
 
     let comm = universe.world();
     let comm = comm.split_by_color(Color::with_value(0)).unwrap();
 
-    // 3. Linearise received keys (remove overlaps if they exist).
-    leaves.linearize();
-
     // 4. Complete region spanned by node.
-    let mut tree = leaves;
     tree.complete();
-    tree.sort();
 
     // 5. Find seeds and compute the coarse blocktree
     let mut seeds = find_seeds(&tree.keys);
-    seeds.sort();
 
-    let points = transfer_leaves_to_coarse_blocktree(
-        &comm,
-        &points,
-        &seeds,
-        &rank,
-        &size
-    );
-
-    let mut blocktree = complete_blocktree(
+    let blocktree = complete_blocktree(
         &mut seeds,
         &rank,
         &size,
         &comm
     );
-    blocktree.sort();
 
     // 5.ii any data below the min seed sent to partner process
     let points = transfer_leaves_to_coarse_blocktree(
@@ -323,8 +329,68 @@ pub fn balanced_tree(
     domain: &Domain,
 ) {
 
-    // 1. Create a distributed unbalanced tree;
-    let unbalanced = unbalanced_tree(universe, points, domain);
+    // Create a distributed unbalanced tree;
+    let comm = universe.world();
+    let mut comm = comm.split_by_color(Color::with_value(0)).unwrap();
+    let rank = comm.rank();
+    let size = comm.size();
+
+    // 1. Encode Points to Leaf Morton Keys, add a global index related to the processor
+    let mut points: Vec<Point> = points
+        .iter()
+        .enumerate()
+        .map(|(i, p)| Point{coordinate: p.clone(), global_idx: i, key: MortonKey::from_point(&p, &domain)})
+        .collect();
+
+    // 2.i Perform parallel Morton sort over encoded points
+    hyksort(&mut points, K, &mut comm);
+
+    // 2.ii Find unique leaf keys on each processor and place in a Tree
+    let keys: Vec<MortonKey> = points
+        .iter()
+        .map(|p| p.key)
+        .collect();
+
+    let mut tree = Tree {keys};
+
+    // 3. Linearise received keys (remove overlaps if they exist).
+    tree.linearize();
+
+    let comm = universe.world();
+    let comm = comm.split_by_color(Color::with_value(0)).unwrap();
+
+    // 4. Complete region spanned by node.
+    tree.complete();
+
+    // 5. Find seeds and compute the coarse blocktree
+    let mut seeds = find_seeds(&tree.keys);
+
+    let blocktree = complete_blocktree(
+        &mut seeds,
+        &rank,
+        &size,
+        &comm
+    );
+
+    // 5.ii any data below the min seed sent to partner process
+    let points = transfer_leaves_to_coarse_blocktree(
+        &comm,
+        &points,
+        &seeds,
+        &rank,
+        &size
+    );
+
+    let keys: Vec<MortonKey> = points
+        .iter()
+        .map(|p| p.key)
+        .collect();
+
+    let mut leaves = Tree{keys};
+    leaves.linearize();
+
+    // 6. Refine blocks based on ncrit
+    let unbalanced_tree = split_blocks(&leaves.keys, blocktree.keys);
 
     // 2. Create the minimal balanced tree for local octants, spanning the entire domain
 

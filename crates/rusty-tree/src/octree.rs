@@ -67,7 +67,7 @@ impl Tree {
                 work_list.append(&mut children);
             }
         }
-        
+
         minimal_tree.sort();
         minimal_tree
     }
@@ -78,6 +78,7 @@ impl Tree {
         let mut completion = Tree::complete_region(&a, &b);
         completion.push(a.clone());
         completion.push(b.clone());
+        completion.sort();
         self.keys = completion;
     }
 
@@ -140,7 +141,7 @@ mod tests {
         .iter()
         .map(|p| Point{coordinate: p.clone(), global_idx: 0, key: MortonKey::from_point(&p, &domain)})
         .collect();
-        
+
         let keys: Vec<MortonKey> = points
         .iter()
         .map(|p| p.key)
@@ -153,7 +154,7 @@ mod tests {
     fn test_linearize() {
         let mut tree = tree_fixture();
         tree.linearize();
-        
+
         /// Test that a linearized tree is sorted
         for i in 0..(tree.iter().len()-1) {
             let a = tree[i];
@@ -167,10 +168,10 @@ mod tests {
 
         /// Test that a linearized tree contains no overlaps
         let mut copy: Vec<MortonKey> = tree.keys.iter().cloned().collect();
-        for &key in tree.iter() { 
+        for &key in tree.iter() {
             let ancestors = key.ancestors();
             copy.retain(|&k| k != key);
-            
+
             for ancestor in &ancestors {
                 assert!(!copy.contains(ancestor))
             }
@@ -179,10 +180,10 @@ mod tests {
 
     #[test]
     fn test_complete_region() {
-        
+
         let a: MortonKey = MortonKey { anchor: [0, 0, 0], morton: 16};
         let b: MortonKey = MortonKey {anchor: [65535, 65535, 65535], morton: 0b111111111111111111111111111111111111111111111111000000000010000};
-        
+
         let mut region = Tree::complete_region(&a, &b);
 
         let fa = a.finest_ancestor(&b);
@@ -219,6 +220,6 @@ mod tests {
             let b = region[i+1];
 
             assert!(a <= b);
-        } 
+        }
     }
 }

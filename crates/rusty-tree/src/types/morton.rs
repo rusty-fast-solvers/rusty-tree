@@ -16,7 +16,7 @@ use mpi::{
 
 use crate::{
     constants::{
-        DEEPEST_LEVEL, LEVEL_SIZE
+        DEEPEST_LEVEL, LEVEL_SIZE, DIRECTIONS
     },
     types::{
         domain::Domain,
@@ -108,7 +108,9 @@ impl MortonKey {
 
         let parent_level = level - 1;
         let bit_multiplier = DEEPEST_LEVEL - parent_level;
-        let parent_morton_without_level = (morton >> 3 * bit_multiplier) << (3 * bit_multiplier); // Zeros out the last 3 * bit_multiplier bits of the Morton index
+
+        // Zeros out the last 3 * bit_multiplier bits of the Morton index
+        let parent_morton_without_level = (morton >> 3 * bit_multiplier) << (3 * bit_multiplier);
 
         let parent_morton = (parent_morton_without_level << LEVEL_DISPLACEMENT) | parent_level;
 
@@ -215,19 +217,19 @@ impl MortonKey {
         }
     }
 
-    // /// Return a point with the coordinates of the anchor
-    // pub fn to_coordinates(&self, domain: &Domain) -> [PointType; 3] {
-    //     let mut coord: [PointType; 3] = [0.0; 3];
+    /// Return a point with the coordinates of the anchor
+    pub fn to_coordinates(&self, domain: &Domain) -> [PointType; 3] {
+        let mut coord: [PointType; 3] = [0.0; 3];
 
-    //     for (anchor_value, coord_ref, origin_value, diameter_value) in
-    //         izip!(self.anchor, &mut coord, &domain.origin, &domain.diameter)
-    //     {
-    //         *coord_ref = origin_value
-    //             + diameter_value * (anchor_value as PointType) / (LEVEL_SIZE as PointType);
-    //     }
+        for (anchor_value, coord_ref, origin_value, diameter_value) in
+            izip!(self.anchor, &mut coord, &domain.origin, &domain.diameter)
+        {
+            *coord_ref = origin_value
+                + diameter_value * (anchor_value as PointType) / (LEVEL_SIZE as PointType);
+        }
 
-    //     coord
-    // }
+        coord
+    }
 
     /// Serialized representation of a box associated with a key.
     ///
@@ -316,7 +318,7 @@ impl MortonKey {
     pub fn find_key_in_direction(&self, direction: &[i64; 3]) -> Option<MortonKey> {
         let level = self.level();
 
-        let max_number_of_boxes: i64 = 1 << level;
+        let max_number_of_boxes: i64 = 1 << DEEPEST_LEVEL;
         let step_multiplier: i64 = (1 << (DEEPEST_LEVEL - level)) as i64;
 
         let x: i64 = self.anchor[0] as i64;
@@ -344,6 +346,16 @@ impl MortonKey {
             None
         }
     }
+
+    /// Find all neighbors for to a given key.
+    pub fn neighbors(&self) -> Vec<MortonKey> {
+        DIRECTIONS
+            .iter()
+            .map(|d| self.find_key_in_direction(d))
+            // .filter(|d| !d.is_none())
+            .map(|d| d.unwrap())
+            .collect()
+    }
 }
 
 impl PartialEq for MortonKey {
@@ -351,7 +363,6 @@ impl PartialEq for MortonKey {
         self.morton == other.morton
     }
 }
-
 impl Eq for MortonKey {}
 
 impl Ord for MortonKey {
@@ -813,7 +824,7 @@ mod tests {
         let mut tree = Tree{keys};
         tree.linearize();
 
-        /// Test that Z order is maintained when sorted
+        // Test that Z order is maintained when sorted
         for i in 0..(tree.keys.len() - 1) {
             let a = tree.keys[i];
             let b = tree.keys[i+1];
@@ -862,31 +873,169 @@ mod tests {
         let mut ancestors: Vec<MortonKey> = key.ancestors().into_iter().collect();
         ancestors.sort();
 
-        /// Test that all ancestors found
+        // Test that all ancestors found
         let mut current_level = 0;
         for &ancestor in &ancestors {
             assert!(ancestor.level() == current_level);
             current_level += 1;
         }
 
-        /// Test that the ancestors include the key at the leaf level
+        // Test that the ancestors include the key at the leaf level
         assert!(ancestors.contains(&key));
     }
 
     #[test]
     pub fn test_finest_ancestor() {
-        /// Trivial case
+        // Trivial case
         let key: MortonKey = MortonKey { anchor: [0, 0, 0], morton: 0};
         let result = key.finest_ancestor(&key);
         let expected : MortonKey = MortonKey { anchor: [0, 0, 0], morton: 0};
         assert!(result == expected);
 
-        /// Standard case
+        // Standard case
         let displacement = 1 << (DEEPEST_LEVEL-key.level()-1);
         let a: MortonKey = MortonKey { anchor: [0, 0, 0], morton: 16};
         let b: MortonKey = MortonKey {anchor: [displacement, displacement, displacement], morton: 0b111000000000000000000000000000000000000000000000000000000000001};
         let result = a.finest_ancestor(&b);
         let expected : MortonKey = MortonKey { anchor: [0, 0, 0], morton: 0};
         assert!(result == expected);
+    }
+
+    #[test]
+    pub fn test_find_key_in_direct() {
+        let point = [0.5, 0.5, 0.5];
+        let domain: Domain = Domain {diameter: [1., 1., 1.], origin: [0., 0., 0.]};
+
+        let key = MortonKey::from_point(&point, &domain);
+        let direction = [1, 0, 0];
+
+        // assert!(false)
+    }
+
+    #[test]
+    pub fn test_neighbors() {
+        let point = [0.5, 0.5, 0.5];
+        let domain: Domain = Domain {diameter: [1., 1., 1.], origin: [0., 0., 0.]};
+        let key = MortonKey::from_point(&point, &domain);
+        let ancestors: Vec<MortonKey> = key.ancestors().into_iter().collect();
+
+        // Simple case, at the leaf level
+        {
+            let mut result = key.neighbors();
+            result.sort();
+
+            // Test that we get the expected number of neighbors
+            assert!(result.len() == 26);
+
+            // Test that the displacements are correct
+            let displacement = 1 << (DEEPEST_LEVEL - key.level()) as i64;
+            let anchor = key.anchor;
+            let mut expected: [[i64; 3]; 26] = [
+                [-displacement, -displacement, -displacement],
+                [-displacement, -displacement, 0],
+                [-displacement, -displacement, displacement],
+                [-displacement, 0, -displacement],
+                [-displacement, 0, 0],
+                [-displacement, 0, displacement],
+                [-displacement, displacement, -displacement],
+                [-displacement, displacement, 0],
+                [-displacement, displacement, displacement],
+                [0, -displacement, -displacement],
+                [0, -displacement, 0],
+                [0, -displacement, displacement],
+                [0, 0, -displacement],
+                [0, 0, displacement],
+                [0, displacement, -displacement],
+                [0, displacement, 0],
+                [0, displacement, displacement],
+                [displacement, -displacement, -displacement],
+                [displacement, -displacement, 0],
+                [displacement, -displacement, displacement],
+                [displacement, 0, -displacement],
+                [displacement, 0, 0],
+                [displacement, 0, displacement],
+                [displacement, displacement, -displacement],
+                [displacement, displacement, 0],
+                [displacement, displacement, displacement],
+            ];
+
+            let mut expected: Vec<MortonKey> = expected
+                .iter()
+                .map(|n| [
+                    (n[0]+(anchor[0] as i64)) as u64,
+                    (n[1]+(anchor[1] as i64)) as u64,
+                    (n[2]+(anchor[2] as i64)) as u64,
+                    ])
+                .map(|anchor| MortonKey::from_anchor(&anchor))
+                .collect();
+            expected.sort();
+
+            for i in 0..26 {
+                assert!(expected[i] == result[i]);
+            }
+        }
+
+        // More complex case, in the middle of the tree
+        {
+            let parent = key.parent().parent().parent();
+            let mut result = parent.neighbors();
+            result.sort();
+
+            // Test that we get the expected number of neighbors
+            assert!(result.len() == 26);
+
+            // Test that the displacements are correct
+            let displacement = 1 << (DEEPEST_LEVEL - parent.level()) as i64;
+            let anchor = key.anchor;
+            let mut expected: [[i64; 3]; 26] = [
+                [-displacement, -displacement, -displacement],
+                [-displacement, -displacement, 0],
+                [-displacement, -displacement, displacement],
+                [-displacement, 0, -displacement],
+                [-displacement, 0, 0],
+                [-displacement, 0, displacement],
+                [-displacement, displacement, -displacement],
+                [-displacement, displacement, 0],
+                [-displacement, displacement, displacement],
+                [0, -displacement, -displacement],
+                [0, -displacement, 0],
+                [0, -displacement, displacement],
+                [0, 0, -displacement],
+                [0, 0, displacement],
+                [0, displacement, -displacement],
+                [0, displacement, 0],
+                [0, displacement, displacement],
+                [displacement, -displacement, -displacement],
+                [displacement, -displacement, 0],
+                [displacement, -displacement, displacement],
+                [displacement, 0, -displacement],
+                [displacement, 0, 0],
+                [displacement, 0, displacement],
+                [displacement, displacement, -displacement],
+                [displacement, displacement, 0],
+                [displacement, displacement, displacement],
+            ];
+
+            let mut expected: Vec<MortonKey> = expected
+                .iter()
+                .map(|n| [
+                    (n[0]+(anchor[0] as i64)) as u64,
+                    (n[1]+(anchor[1] as i64)) as u64,
+                    (n[2]+(anchor[2] as i64)) as u64,
+                    ])
+                .map(|anchor| MortonKey::from_anchor(&anchor))
+                .map(
+                    |key| MortonKey{
+                    anchor: key.anchor,
+                    morton: ((key.morton >> LEVEL_DISPLACEMENT) << LEVEL_DISPLACEMENT) | parent.level()
+                })
+                .collect();
+            expected.sort();
+
+            for i in 0..26 {
+                assert!(expected[i] == result[i]);
+            }
+        }
+
     }
 }
