@@ -168,7 +168,8 @@ pub fn assign_blocks_to_points(
         if blocktree_set.contains(leaf) {
             map.insert(leaf.clone(), leaf.clone());
         } else {
-            let ancestors = leaf.ancestors();
+            let mut ancestors: Vec<MortonKey> = leaf.ancestors().into_iter().collect();
+            ancestors.sort();
             for ancestor in ancestors {
                 if blocktree_set.contains(&ancestor) {
                     map.insert(leaf.clone(), ancestor);
@@ -374,10 +375,9 @@ pub fn balanced_tree(
     let unbalanced_tree = split_blocks(&leaves.keys, blocktree.keys);
 
     // 7.i Create the minimal balanced tree for local octants, spanning the entire domain, and linearize
-    let linearized = Tree {
+    let mut linearized = Tree {
         keys: unbalanced_tree.into_iter().map(|(_, block)| block).collect()
     };
-
     linearized.balance();
 
     // 7.ii Assign the local points to the elements of this new balanced tree

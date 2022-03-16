@@ -180,7 +180,6 @@ impl MortonKey {
     /// Check if the key is ancestor of `other`.
     pub fn is_ancestor(&self, other: &MortonKey) -> bool {
         let ancestors = other.ancestors();
-
         ancestors.contains(self)
     }
 

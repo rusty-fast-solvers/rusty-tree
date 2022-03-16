@@ -94,10 +94,10 @@ impl Tree {
     /// Balance a tree, and remove overlaps
     pub fn balance(&self) -> Tree {
 
-        let mut balanced: Vec<MortonKey> = self.keys.iter().cloned().collect();
+        let mut balanced: HashSet<MortonKey> = self.keys.iter().cloned().collect();
 
         for level in (0..DEEPEST_LEVEL).rev() {
-            let work_list: Vec<MortonKey> = self
+            let work_list: Vec<MortonKey> = balanced
                 .iter()
                 .filter(|key| key.level() == level)
                 .cloned()
@@ -109,11 +109,11 @@ impl Tree {
                 for neighbor in neighbors {
                     let parent = neighbor.parent();
                     if !balanced.contains(&neighbor) && !balanced.contains(&neighbor) {
-                        balanced.push(parent);
+                        balanced.insert(parent);
 
                         if parent.level() > 0 {
                             for sibling in parent.siblings() {
-                                balanced.push(sibling);
+                                balanced.insert(sibling);
                             }
                         }
                     }
@@ -121,6 +121,7 @@ impl Tree {
             }
         }
 
+        let mut balanced: Vec<MortonKey> = balanced.into_iter().collect();
         balanced.sort();
         let linearized = Tree::linearize_keys(balanced);
         Tree{keys: linearized}
