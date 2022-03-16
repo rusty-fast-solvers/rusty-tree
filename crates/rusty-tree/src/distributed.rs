@@ -34,7 +34,7 @@ impl DistributedTree {
             let (points, keys_to_nodes) = DistributedTree::balanced_tree(universe, points, domain);
             let keys = points.iter().map(|p| p.key).collect();
 
-            DistributedTree{
+            DistributedTree {
                 balanced,
                 points,
                 keys: keys,
@@ -44,7 +44,7 @@ impl DistributedTree {
             let (points, keys_to_nodes) = DistributedTree::unbalanced_tree(universe, points, domain);
             let keys = points.iter().map(|p| p.key).collect();
 
-            DistributedTree{
+            DistributedTree {
                 balanced,
                 points,
                 keys: keys,
@@ -336,16 +336,11 @@ impl DistributedTree {
             &size
         );
 
-        let keys: Vec<MortonKey> = points
-            .iter()
-            .map(|p| p.key)
-            .collect();
-
-        let mut leaves = Tree{keys};
-        leaves.linearize();
-
         // 6. Refine blocks based on ncrit
-        let map = DistributedTree::split_blocks(&leaves.keys, blocktree.keys);
+        let map = DistributedTree::split_blocks(
+            &points.iter().map(|p| p.key).collect(),
+            blocktree.keys
+        );
 
         (points, map)
     }
@@ -389,7 +384,7 @@ impl DistributedTree {
         // 4. Complete region spanned by node.
         tree.complete();
 
-        // 5. Find seeds and compute the coarse blocktree
+        // 5.i Find seeds and compute the coarse blocktree
         let mut seeds = DistributedTree::find_seeds(&tree.keys);
 
         let blocktree = DistributedTree::complete_blocktree(
@@ -399,7 +394,7 @@ impl DistributedTree {
             &comm
         );
 
-        // 5.ii any data below the min seed sent to partner process
+        // 5.ii Send data below the min seed sent to partner process
         let points = DistributedTree::transfer_points_to_blocktree(
             &comm,
             &points,
@@ -408,15 +403,11 @@ impl DistributedTree {
             &size
         );
 
-        let keys: Vec<MortonKey> = points
-            .iter()
-            .map(|p| p.key)
-            .collect();
-
-        let leaves = Tree{keys};
-
         // 6. Refine blocks based on ncrit
-        let unbalanced_tree = DistributedTree::split_blocks(&leaves.keys, blocktree.keys);
+        let unbalanced_tree = DistributedTree::split_blocks(
+            &points.iter().map(|p| p.key).collect(),
+            blocktree.keys
+        );
 
         // 7.i Create the minimal balanced tree for local octants, spanning the entire domain, and linearize
         let linearized = Tree {
@@ -424,9 +415,9 @@ impl DistributedTree {
         };
         linearized.balance();
 
-        // 7.ii Assign the local points to the elements of this new balanced tree
+        // 7.ii Assign the local leaves to the elements of this new balanced tree
         let points_to_balanced = DistributedTree::assign_nodes_to_leaves(
-            &leaves.keys,
+            &points.iter().map(|p| p.key).collect(),
             linearized.keys,
         );
 
