@@ -473,7 +473,7 @@ mod tests {
     use super::*;
     use rand::Rng;
 
-    use crate::octree::Tree;
+    use crate::single_node::Tree;
 
     /// Subroutine in less than function, equivalent to comparing floor of log_2(x). Adapted from [3].
     fn most_significant_bit(x: u64, y: u64) -> bool {

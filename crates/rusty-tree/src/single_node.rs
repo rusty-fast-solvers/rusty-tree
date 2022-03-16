@@ -1,20 +1,26 @@
-// //! Data structures and functions to create regular and adaptive Octrees.
+//! Data structures and functions to create Octrees on a single node.
 
 use std::{
     ops::{Deref, DerefMut},
-    collections::{HashSet}
+    collections::{HashSet, HashMap}
 };
 
 use itertools::Itertools;
 
 use crate::{
     constants::DEEPEST_LEVEL,
-    types::morton::{MortonKey}
+    types::{
+        point::Point,
+        morton::{MortonKey}
+    }
 };
 
 
 #[derive(Debug)]
 pub struct Tree {
+    // pub balanced: bool,
+    // pub points: Vec<Point>,
+    // pub points_to_nodes: HashMap<MortonKey, MortonKey>,
     pub keys: Vec<MortonKey>,
 }
 
@@ -149,7 +155,6 @@ mod tests {
     use rand::prelude::*;
     use rand::{SeedableRng};
 
-    use crate::octree::Tree;
     use crate::types::{
         morton::MortonKey,
         domain::Domain,

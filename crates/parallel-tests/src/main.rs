@@ -7,7 +7,7 @@ use rand::SeedableRng;
 
 use rusty_tree::{
     constants::{NCRIT, ROOT},
-    distribute::{balanced_tree, unbalanced_tree},
+    distributed::DistributedTree,
     types::{domain::Domain, morton::MortonKey},
 };
 
@@ -28,7 +28,7 @@ fn points_fixture() -> Vec<[f64; 3]> {
     points
 }
 
-fn unbalanced_tree_fixture(universe: &Universe) -> HashMap<MortonKey, MortonKey> {
+fn unbalanced_tree_fixture(universe: &Universe) -> DistributedTree {
     // Experimental Parameters
     let k: Rank = 2;
     let domain = Domain {
@@ -38,10 +38,10 @@ fn unbalanced_tree_fixture(universe: &Universe) -> HashMap<MortonKey, MortonKey>
 
     let points = points_fixture();
 
-    unbalanced_tree(&universe, points, &domain)
+    DistributedTree::new(&points, &domain, false, &universe)
 }
 
-fn balanced_tree_fixture(universe: &Universe) -> HashMap<MortonKey, MortonKey> {
+fn balanced_tree_fixture(universe: &Universe) -> DistributedTree {
     // Experimental Parameters
     let k: Rank = 2;
     let domain = Domain {
@@ -51,7 +51,7 @@ fn balanced_tree_fixture(universe: &Universe) -> HashMap<MortonKey, MortonKey> {
 
     let points = points_fixture();
 
-    balanced_tree(&universe, points, &domain)
+    DistributedTree::new(&points, &domain, true, &universe)
 }
 
 /// Test that the tree satisfies the ncrit condition.
@@ -148,7 +148,7 @@ fn test_no_overlaps(universe: &Universe, tree: &HashMap<MortonKey, MortonKey>) {
 
     // Test that the partner's minimum node is greater than the process's maximum node
     if rank < size -1 {
-        assert!(max <= &partner_min)
+        assert!(max < &partner_min)
     }
 }
 
@@ -163,16 +163,16 @@ fn main() {
 
     // Tests for the unbalanced tree
     {
-        test_ncrit(&unbalanced);
-        test_span(&unbalanced, rank);
-        test_no_overlaps(&universe, &unbalanced);
+        test_ncrit(&unbalanced.keys_to_nodes);
+        test_span(&unbalanced.keys_to_nodes, rank);
+        test_no_overlaps(&universe, &unbalanced.keys_to_nodes);
     }
 
     // Tests for the balanced tree
     {
-        test_ncrit(&balanced);
-        test_span(&balanced, rank);
-        test_no_overlaps(&universe, &balanced);
+        test_ncrit(&balanced.keys_to_nodes);
+        test_span(&balanced.keys_to_nodes, rank);
+        test_no_overlaps(&universe, &balanced.keys_to_nodes);
     }
 
 }
