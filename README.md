@@ -28,9 +28,6 @@ const NPOINTS: u64 = 100000;
 
 
 fn main () {
-    // K parameter in hyksort [2], must be power of 2.
-    let k: Rank = 2;
-
     // Define a domian over which to sample a random set of points
     let domain = Domain {
         origin: [0., 0., 0.],
