@@ -12,7 +12,6 @@ Cargo.lock
 # Python
 **/__pycache__/*
 *.py[oc]
-*.ipynb
 
 # Lib
 *.so
