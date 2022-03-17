@@ -1,7 +1,6 @@
 //! Data Strictires and Algorithms for Cartesian Points in 3D.
 
 use std::cmp::Ordering;
-use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 
 use memoffset::offset_of;
@@ -17,7 +16,7 @@ use crate::types::morton::{MortonKey, KeyType};
 pub type PointType = f64;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Point {
     pub coordinate: [PointType; 3],
     pub global_idx: usize,
@@ -53,16 +52,6 @@ unsafe impl Equivalence for Point {
                 ).as_ref()
             ]
         )
-    }
-}
-
-impl Default for Point {
-    fn default() -> Self {
-        Point {
-            coordinate: [PointType::default(), PointType::default(), PointType::default()],
-            global_idx: usize::default(),
-            key: MortonKey::default(),
-        }
     }
 }
 

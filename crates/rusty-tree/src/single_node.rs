@@ -2,7 +2,7 @@
 
 use std::{
     ops::{Deref, DerefMut},
-    collections::{HashSet, HashMap}
+    collections::{HashSet}
 };
 
 use itertools::Itertools;
@@ -10,8 +10,7 @@ use itertools::Itertools;
 use crate::{
     constants::DEEPEST_LEVEL,
     types::{
-        point::Point,
-        morton::{MortonKey}
+        morton::MortonKey
     }
 };
 
@@ -38,10 +37,10 @@ impl Tree {
         // is not an ancestor of the next item. Add final element.
         keys.into_iter().enumerate().tuple_windows::<((_, _), (_, _))>().for_each(|((_, a), (j, b))| {
             if !a.is_ancestor(&b) {
-                new_keys.push(a.clone());
+                new_keys.push(a);
             }
             if j == (nkeys -1) {
-                new_keys.push(b.clone());
+                new_keys.push(b);
             }
         });
 
@@ -57,12 +56,10 @@ impl Tree {
         a_ancestors.remove(a);
         b_ancestors.remove(b);
 
-        let mut work_list: Vec<MortonKey> = a.finest_ancestor(&b).children().into_iter().collect();
-
         let mut minimal_tree: Vec<MortonKey> = Vec::new();
+        let mut work_list: Vec<MortonKey> = a.finest_ancestor(b).children().into_iter().collect();
 
-        while work_list.len() > 0 {
-        // println!("work list {:?} \n", work_list);
+        while !work_list.is_empty() {
             let current_item = work_list.pop().unwrap();
             if (current_item > *a) & (current_item < *b) & !b_ancestors.contains(&current_item)
             {
@@ -81,9 +78,9 @@ impl Tree {
     pub fn complete(self: &mut Tree) {
         let a = self.keys.iter().min().unwrap();
         let b = self.keys.iter().max().unwrap();
-        let mut completion = Tree::complete_region(&a, &b);
-        completion.push(a.clone());
-        completion.push(b.clone());
+        let mut completion = Tree::complete_region(a, b);
+        completion.push(*a);
+        completion.push(*b);
         completion.sort();
         self.keys = completion;
     }

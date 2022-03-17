@@ -28,7 +28,7 @@ pub struct DistributedTree {
 
 impl DistributedTree {
 
-    pub fn new(points: &Vec<[PointType; 3]>, domain: &Domain, balanced: bool, universe: &Universe) -> DistributedTree {
+    pub fn new(points: &[[PointType; 3]], domain: &Domain, balanced: bool, universe: &Universe) -> DistributedTree {
 
         if balanced {
             let (points, keys_to_nodes) = DistributedTree::balanced_tree(universe, points, domain);
@@ -37,7 +37,7 @@ impl DistributedTree {
             DistributedTree {
                 balanced,
                 points,
-                keys: keys,
+                keys,
                 keys_to_nodes,
             }
         } else {
@@ -47,7 +47,7 @@ impl DistributedTree {
             DistributedTree {
                 balanced,
                 points,
-                keys: keys,
+                keys,
                 keys_to_nodes,
             }
         }
@@ -65,7 +65,7 @@ impl DistributedTree {
         if rank == 0 {
             let ffc_root = ROOT.finest_first_child();
             let min = seeds.iter().min().unwrap();
-            let fa = ffc_root.finest_ancestor(&min);
+            let fa = ffc_root.finest_ancestor(min);
             let first_child = fa.children().into_iter().min().unwrap();
             seeds.push(first_child);
             seeds.sort();
@@ -74,7 +74,7 @@ impl DistributedTree {
         if rank == (size - 1) {
             let flc_root = ROOT.finest_last_child();
             let max = seeds.iter().max().unwrap();
-            let fa = flc_root.finest_ancestor(&max);
+            let fa = flc_root.finest_ancestor(max);
             let last_child = fa.children().into_iter().max().unwrap();
             seeds.push(last_child);
         }
@@ -87,7 +87,7 @@ impl DistributedTree {
 
         // Send required data to partner process.
         if rank > 0 {
-            let min = seeds.iter().min().unwrap().clone();
+            let min = *seeds.iter().min().unwrap();
             previous_process.send(&min);
         }
 
@@ -111,7 +111,7 @@ impl DistributedTree {
         }
 
         if rank == (size - 1) {
-            complete.keys.push(seeds.last().unwrap().clone());
+            complete.keys.push(*seeds.last().unwrap());
         }
 
         complete.sort();
@@ -129,13 +129,13 @@ impl DistributedTree {
         for leaf in leaves.iter() {
 
             if nodes.contains(leaf) {
-                map.insert(leaf.clone(), leaf.clone());
+                map.insert(*leaf, *leaf);
             } else {
                 let mut ancestors: Vec<MortonKey> = leaf.ancestors().into_iter().collect();
                 ancestors.sort();
                 for ancestor in ancestors {
                     if nodes.contains(&ancestor) {
-                        map.insert(leaf.clone(), ancestor);
+                        map.insert(*leaf, ancestor);
                         break;
                     }
                 }
@@ -163,13 +163,10 @@ impl DistributedTree {
             // Count the number of points in a block
             let mut blocks_to_npoints: HashMap<MortonKey, usize> = HashMap::new();
             for (_, block) in blocks_to_leaves {
-
-                if !blocks_to_npoints.contains_key(&block) {
-                    blocks_to_npoints.insert(block.clone(), 1);
-                } else {
-                    if let Some(b) = blocks_to_npoints.get_mut(&block) {
-                        *b += 1;
-                    };
+                if let std::collections::hash_map::Entry::Vacant(e) = blocks_to_npoints.entry(block) {
+                    e.insert(1);
+                } else if let Some(b) = blocks_to_npoints.get_mut(&block) {
+                        *b += 1;       
                 }
             }
 
@@ -201,10 +198,10 @@ impl DistributedTree {
     }
 
     /// Find the seeds at each processor [1].
-    fn find_seeds(leaves: &Vec<MortonKey>) -> Vec<MortonKey> {
+    fn find_seeds(leaves: &[MortonKey]) -> Vec<MortonKey> {
 
-        let min: MortonKey = leaves.iter().min().unwrap().clone();
-        let max: MortonKey = leaves.iter().max().unwrap().clone();
+        let min: MortonKey = *leaves.iter().min().unwrap();
+        let max: MortonKey = *leaves.iter().max().unwrap();
 
         // Complete the region between the least and greatest leaves.
         let mut complete = Tree::complete_region(&min, &max);
@@ -225,8 +222,8 @@ impl DistributedTree {
     // Transfer points based on the coarse distributed blocktree [REFERENCE ALGORITHM]
     fn transfer_points_to_blocktree(
         comm: &UserCommunicator,
-        points: &Vec<Point>,
-        seeds: &Vec<MortonKey>,
+        points: &[Point],
+        seeds: &[MortonKey],
         &rank: &Rank,
         &size:& Rank,
     ) -> Vec<Point> {
@@ -238,7 +235,7 @@ impl DistributedTree {
         if rank == 0 {
             min_seed = points.iter().min().unwrap().key;
         } else {
-            min_seed = seeds.iter().min().unwrap().clone();
+            min_seed = *seeds.iter().min().unwrap();
         }
 
         let prev_rank = if rank > 0 { rank - 1 } else {size-1};
@@ -277,11 +274,9 @@ impl DistributedTree {
         received_points
     }
 
-
-
     pub fn unbalanced_tree(
         universe: &Universe,
-        points: &Vec<[PointType; 3]>,
+        points: &[[PointType; 3]],
         domain: &Domain,
     ) -> (Vec<Point>, HashMap<MortonKey, MortonKey>) {
 
@@ -294,7 +289,7 @@ impl DistributedTree {
         let mut points: Vec<Point> = points
             .iter()
             .enumerate()
-            .map(|(i, p)| Point{coordinate: p.clone(), global_idx: i, key: MortonKey::from_point(&p, &domain)})
+            .map(|(i, p)| Point{coordinate: *p, global_idx: i, key: MortonKey::from_point(p, domain)})
             .collect();
 
         // 2.i Perform parallel Morton sort over encoded points
@@ -347,7 +342,7 @@ impl DistributedTree {
 
     pub fn balanced_tree(
         universe: &Universe,
-        points: &Vec<[PointType; 3]>,
+        points: &[[PointType; 3]],
         domain: &Domain,
     ) -> (Vec<Point>, HashMap<MortonKey, MortonKey>) {
 
@@ -361,7 +356,7 @@ impl DistributedTree {
         let mut points: Vec<Point> = points
             .iter()
             .enumerate()
-            .map(|(i, p)| Point{coordinate: p.clone(), global_idx: i, key: MortonKey::from_point(&p, &domain)})
+            .map(|(i, p)| Point{coordinate: *p, global_idx: i, key: MortonKey::from_point(p, domain)})
             .collect();
 
         // 2.i Perform parallel Morton sort over encoded points
@@ -426,7 +421,7 @@ impl DistributedTree {
             .map(|p| Point{
                 coordinate: p.coordinate,
                 global_idx: p.global_idx,
-                key: points_to_balanced.get(&p.key).unwrap().clone()
+                key: *points_to_balanced.get(&p.key).unwrap()
             })
             .collect();
 

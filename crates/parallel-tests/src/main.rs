@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use mpi::{environment::Universe, topology::Rank, traits::*};
+use mpi::{environment::Universe, traits::*};
 
 use rand::prelude::*;
 use rand::SeedableRng;
@@ -30,7 +30,6 @@ fn points_fixture() -> Vec<[f64; 3]> {
 
 fn unbalanced_tree_fixture(universe: &Universe) -> DistributedTree {
     // Experimental Parameters
-    let k: Rank = 2;
     let domain = Domain {
         origin: [0., 0., 0.],
         diameter: [1., 1., 1.],
@@ -38,12 +37,11 @@ fn unbalanced_tree_fixture(universe: &Universe) -> DistributedTree {
 
     let points = points_fixture();
 
-    DistributedTree::new(&points, &domain, false, &universe)
+    DistributedTree::new(&points, &domain, false, universe)
 }
 
 fn balanced_tree_fixture(universe: &Universe) -> DistributedTree {
     // Experimental Parameters
-    let k: Rank = 2;
     let domain = Domain {
         origin: [0., 0., 0.],
         diameter: [1., 1., 1.],
@@ -51,38 +49,36 @@ fn balanced_tree_fixture(universe: &Universe) -> DistributedTree {
 
     let points = points_fixture();
 
-    DistributedTree::new(&points, &domain, true, &universe)
+    DistributedTree::new(&points, &domain, true, universe)
 }
 
 /// Test that the tree satisfies the ncrit condition.
 fn test_ncrit(tree: &HashMap<MortonKey, MortonKey>) {
     let mut blocks_to_points: HashMap<MortonKey, usize> = HashMap::new();
 
-    for (_, block) in tree {
-        if !blocks_to_points.contains_key(&block) {
-            blocks_to_points.insert(block.clone(), 1);
-        } else {
-            if let Some(b) = blocks_to_points.get_mut(&block) {
+    for block in tree.values() {
+        if !blocks_to_points.contains_key(block) {
+            blocks_to_points.insert(*block, 1);
+        } else if let Some(b) = blocks_to_points.get_mut(block) {
                 *b += 1;
-            };
         }
     }
 
-    for (_, &count) in &blocks_to_points {
+    for &count in blocks_to_points.values() {
         assert!(count <= NCRIT);
     }
 }
 
 /// Test that the tree spans the entire domain specified by the point distribution.
-fn test_span(tree: &HashMap<MortonKey, MortonKey>, rank: Rank) {
+fn test_span(tree: &HashMap<MortonKey, MortonKey>) {
     let min = tree.iter().map(|(_, block)| block).min().unwrap();
     let max = tree.iter().map(|(_, block)| block).max().unwrap();
-    let block_set: HashSet<MortonKey> = tree.iter().map(|(_, block)| block.clone()).collect();
+    let block_set: HashSet<MortonKey> = tree.iter().map(|(_, block)| *block).collect();
     let max_level = tree.iter().map(|(_, block)| block.level()).max().unwrap();
 
     // Generate a uniform tree at the max level, and filter for range in this processor
     let mut level = 0;
-    let mut uniform = vec![ROOT.clone()];
+    let mut uniform = vec![ROOT];
     while level < max_level {
         let mut descendents: Vec<MortonKey> = Vec::new();
 
@@ -123,7 +119,7 @@ fn test_no_overlaps(universe: &Universe, tree: &HashMap<MortonKey, MortonKey>) {
 
     // Communicate bounds from each process
     let max = tree.iter().map(|(_, block)| block).max().unwrap();
-    let min = tree.iter().map(|(_, block)| block).min().unwrap().clone();
+    let min = *tree.iter().map(|(_, block)| block).min().unwrap();
 
     // Gather all bounds at root
     let size = world.size();
@@ -154,8 +150,6 @@ fn test_no_overlaps(universe: &Universe, tree: &HashMap<MortonKey, MortonKey>) {
 
 fn main() {
     let universe = mpi::initialize().unwrap();
-    let world = universe.world();
-    let rank = world.rank();
 
     // Distributed Trees
     let unbalanced = unbalanced_tree_fixture(&universe);
@@ -164,14 +158,14 @@ fn main() {
     // Tests for the unbalanced tree
     {
         test_ncrit(&unbalanced.keys_to_nodes);
-        test_span(&unbalanced.keys_to_nodes, rank);
+        test_span(&unbalanced.keys_to_nodes);
         test_no_overlaps(&universe, &unbalanced.keys_to_nodes);
     }
 
     // Tests for the balanced tree
     {
         test_ncrit(&balanced.keys_to_nodes);
-        test_span(&balanced.keys_to_nodes, rank);
+        test_span(&balanced.keys_to_nodes);
         test_no_overlaps(&universe, &balanced.keys_to_nodes);
     }
 

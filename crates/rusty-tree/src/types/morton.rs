@@ -30,7 +30,7 @@ use crate::{
 pub type KeyType = u64;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 /// Representation of a Morton key.
 pub struct MortonKey {
     pub anchor: [KeyType; 3],
@@ -54,15 +54,6 @@ unsafe impl Equivalence for MortonKey {
     }
 }
 
-
-impl Default for MortonKey {
-    fn default() -> Self {
-        MortonKey {
-            anchor: [KeyType::default(), KeyType::default(), KeyType::default()],
-            morton: KeyType::default()
-        }
-    }
-}
 
 impl MortonKey {
     /// Return the anchor
@@ -89,17 +80,17 @@ impl MortonKey {
 
     /// Return a `MortonKey` type from the anchor on the deepest level
     pub fn from_anchor(anchor: &[KeyType; 3]) -> Self {
-        let morton = encode_anchor(&anchor, DEEPEST_LEVEL);
+        let morton = encode_anchor(anchor, DEEPEST_LEVEL);
 
         MortonKey {
             anchor: anchor.to_owned(),
-            morton: morton,
+            morton,
         }
     }
 
     /// Return a `MortonKey` associated with the box that encloses the point on the deepest level
     pub fn from_point(point: &[PointType; 3], domain: &Domain) -> Self {
-        let anchor = point_to_anchor(&point, DEEPEST_LEVEL, &domain.origin, &domain.diameter);
+        let anchor = point_to_anchor(point, DEEPEST_LEVEL, &domain.origin, &domain.diameter);
         MortonKey::from_anchor(&anchor)
     }
 
@@ -112,7 +103,7 @@ impl MortonKey {
         let bit_multiplier = DEEPEST_LEVEL - parent_level;
 
         // Zeros out the last 3 * bit_multiplier bits of the Morton index
-        let parent_morton_without_level = (morton >> 3 * bit_multiplier) << (3 * bit_multiplier);
+        let parent_morton_without_level = (morton >> (3 * bit_multiplier)) << (3 * bit_multiplier);
 
         let parent_morton = (parent_morton_without_level << LEVEL_DISPLACEMENT) | parent_level;
 
@@ -139,17 +130,17 @@ impl MortonKey {
     pub fn finest_last_child(&self) -> Self {
         if self.level() < DEEPEST_LEVEL {
             let mut level_diff = DEEPEST_LEVEL - self.level();
-            let mut flc = self.children().iter().max().unwrap().clone();
+            let mut flc = *self.children().iter().max().unwrap();
 
             while level_diff > 1 {
                 let tmp = flc;
-                flc = tmp.children().iter().max().unwrap().clone();
+                flc = *tmp.children().iter().max().unwrap();
                 level_diff -= 1;
             }
 
             flc
         } else {
-            self.clone()
+            *self
         }}
 
     /// Return all children in order of their Morton indices
@@ -192,7 +183,7 @@ impl MortonKey {
     pub fn ancestors(&self) -> HashSet<MortonKey> {
         let mut ancestors = HashSet::<MortonKey>::new();
 
-        let mut current = self.clone();
+        let mut current = *self;
 
         ancestors.insert(current);
 
@@ -207,7 +198,7 @@ impl MortonKey {
     /// Find the finest ancestor of key and another key
     pub fn finest_ancestor(&self, other: &MortonKey) -> MortonKey {
         if self == other {
-            return other.clone();
+            *other
         } else {
             let my_ancestors = self.ancestors();
             let mut current = other.parent();
@@ -278,8 +269,8 @@ impl MortonKey {
                     + diameter_value * (anchor_value as PointType) / (LEVEL_SIZE as PointType);
             }
 
-            for index in 0..3 {
-                serialized.push(coord[index]);
+            for component in &coord {
+                serialized.push(*component);
             }
         }
 
@@ -387,7 +378,7 @@ impl Hash for MortonKey {
 
 /// Return the level associated with a key.
 fn find_level(morton: KeyType) -> KeyType {
-    return morton & LEVEL_MASK;
+    morton & LEVEL_MASK
 }
 
 /// Helper function for decoding keys.
