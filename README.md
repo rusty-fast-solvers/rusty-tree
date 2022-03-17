@@ -15,29 +15,29 @@ cargo build
 use rand::prelude::*;
 use rand::SeedableRng;
 
+use mpi::{
+    environment::Universe, 
+    topology::{Color, UserCommunicator},
+    traits::*
+};
+
 use rusty_tree::{
     constants::{NCRIT, ROOT},
     distributed::DistributedTree,
     types::{
         domain::Domain,
         morton::MortonKey
+        point::PointType, 
     },
 };
 
 const NPOINTS: u64 = 100000;
 
-
 fn main () {
-    // Define a domian over which to sample a random set of points
-    let domain = Domain {
-        origin: [0., 0., 0.],
-        diameter: [1., 1., 1.],
-    };
-
     // Generate a set of randomly distributed points
     let mut range = StdRng::seed_from_u64(0);
     let between = rand::distributions::Uniform::from(0.0..1.0);
-    let mut points = Vec::new();
+    let mut points: Vec<[PointType; 3]> = Vec::new();
 
     for _ in 0..NPOINTS {
         points.push([
@@ -48,15 +48,20 @@ fn main () {
     }
 
     // Setup an MPI environment
-    let universe = mpi::initialize().unwrap();
+    let universe: Universe = mpi::initialize().unwrap();
+    let comm: UserCommunicator = universe.world();
+    let comm = comm.split_by_color(Color::with_value(0)).unwrap();
+    
+    // Calculate the global domain defined by the distributed points
+    let domain: Domain = compute_global_domain(&points, &comm);
 
     // Generate a distributed tree
 
     // Unbalanced
-    let unbalanced = DistributedTree::new(&points, &domain, false, &universe)
+    let unbalanced: DistributedTree = DistributedTree::new(&points, &domain, false, &universe)
 
     // Balanced
-    let balanced_tree = DistributedTree::new(&points, &domain, true, &universe)
+    let balanced_tree: DistributedTree = DistributedTree::new(&points, &domain, true, &universe)
 }
 ```
 
