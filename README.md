@@ -31,15 +31,15 @@ use rusty_tree::{
     },
 };
 
-const NPOINTS: u64 = 100000;
 
 fn main () {
     // Generate a set of randomly distributed points
     let mut range = StdRng::seed_from_u64(0);
     let between = rand::distributions::Uniform::from(0.0..1.0);
     let mut points: Vec<[PointType; 3]> = Vec::new();
+    let npoints = 1000000;
 
-    for _ in 0..NPOINTS {
+    for _ in 0..npoints {
         points.push([
             between.sample(&mut range),
             between.sample(&mut range),
