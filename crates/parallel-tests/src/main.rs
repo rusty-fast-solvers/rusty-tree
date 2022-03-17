@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use mpi::{environment::Universe, traits::*};
+use mpi::{environment::Universe, topology::Color, traits::*};
 
 use rand::prelude::*;
 use rand::SeedableRng;
@@ -8,6 +8,7 @@ use rand::SeedableRng;
 use rusty_tree::{
     constants::{NCRIT, ROOT},
     distributed::DistributedTree,
+    helpers::compute_global_domain,
     types::{domain::Domain, morton::MortonKey},
 };
 
@@ -31,26 +32,20 @@ fn points_fixture() -> Vec<[f64; 3]> {
 
 /// Test fixture for an unbalanced tree.
 fn unbalanced_tree_fixture(universe: &Universe) -> DistributedTree {
-    // Experimental Parameters
-    let domain = Domain {
-        origin: [0., 0., 0.],
-        diameter: [1., 1., 1.],
-    };
-
     let points = points_fixture();
+    let comm = universe.world();
+    let comm = comm.split_by_color(Color::with_value(0)).unwrap();
+    let domain = compute_global_domain(&points, &comm);
 
     DistributedTree::new(&points, &domain, false, universe)
 }
 
 /// Test fixture for an balanced tree.
 fn balanced_tree_fixture(universe: &Universe) -> DistributedTree {
-    // Experimental Parameters
-    let domain = Domain {
-        origin: [0., 0., 0.],
-        diameter: [1., 1., 1.],
-    };
-
     let points = points_fixture();
+    let comm = universe.world();
+    let comm = comm.split_by_color(Color::with_value(0)).unwrap();
+    let domain = compute_global_domain(&points, &comm);
 
     DistributedTree::new(&points, &domain, true, universe)
 }
@@ -151,6 +146,25 @@ fn test_no_overlaps(universe: &Universe, tree: &HashMap<MortonKey, MortonKey>) {
     }
 }
 
+
+/// Test that the globally defined domain contains all the points at a given node.
+fn test_global_bounds(universe: &Universe) {
+
+    let points = points_fixture();
+
+    let comm = universe.world();
+    let comm = comm.split_by_color(Color::with_value(0)).unwrap();
+
+    let domain = compute_global_domain(&points, &comm);
+
+    // Test that all local points are contained within the global domain
+    for point in points {
+        assert!(domain.origin[0] <= point[0] && point[0] <= domain.origin[0]+domain.diameter[0]);
+        assert!(domain.origin[1] <= point[1] && point[1] <= domain.origin[1]+domain.diameter[1]);
+        assert!(domain.origin[2] <= point[2] && point[2] <= domain.origin[2]+domain.diameter[2]);
+    }
+}
+
 /// Parallel test suite.
 fn main() {
     let universe = mpi::initialize().unwrap();
@@ -173,4 +187,8 @@ fn main() {
         test_no_overlaps(&universe, &balanced.points_to_keys);
     }
 
+    // Other parallel functionality
+    {
+        test_global_bounds(&universe);
+    }
 }
