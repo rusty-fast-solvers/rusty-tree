@@ -1,4 +1,4 @@
-// //! Data structures and functions for regular octrees.
+//! Adaptor for uniform octrees. 
 // //! 
 // //! This module implements a regular Octree data structure.
 // //! A regular tree subdivides uniformly on all levels. To avoid

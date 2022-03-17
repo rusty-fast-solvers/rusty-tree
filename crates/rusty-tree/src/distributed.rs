@@ -1,4 +1,5 @@
-//! Data structures and functions to create distributed Octrees with MPI.
+//! Data structures and metbhods to create distributed Octrees with MPI.
+
 use std::collections::{HashSet, HashMap};
 
 use mpi::{
@@ -19,37 +20,45 @@ use crate::{
     }
 };
 
-/// Interface for a distributed tree
+/// Interface for a distributed tree, adaptive by default.
 pub struct DistributedTree {
+    /// Balancing is optional.
     pub balanced: bool,
+    
+    ///  A vector of Cartesian points.
     pub points: Vec<Point>,
-    pub keys_to_nodes: HashMap<MortonKey, MortonKey>,
+    
+    /// Map between the point's minimum leaf encoding, and the nodes in the tree. 
+    pub points_to_keys: HashMap<MortonKey, MortonKey>,
+    
+    /// The nodes that span the tree, define it's leaf nodes.
     pub keys: Vec<MortonKey>
 }
 
 impl DistributedTree {
 
+    /// Create a new DistributedOctree from a set of distributed points which define a domain.
     pub fn new(points: &[[PointType; 3]], domain: &Domain, balanced: bool, universe: &Universe) -> DistributedTree {
 
         if balanced {
-            let (points, keys_to_nodes) = DistributedTree::balanced_tree(universe, points, domain);
+            let (points, points_to_keys) = DistributedTree::balanced_tree(universe, points, domain);
             let keys = points.iter().map(|p| p.key).collect();
 
             DistributedTree {
                 balanced,
                 points,
                 keys,
-                keys_to_nodes,
+                points_to_keys,
             }
         } else {
-            let (points, keys_to_nodes) = DistributedTree::unbalanced_tree(universe, points, domain);
+            let (points, points_to_keys) = DistributedTree::unbalanced_tree(universe, points, domain);
             let keys = points.iter().map(|p| p.key).collect();
 
             DistributedTree {
                 balanced,
                 points,
                 keys,
-                keys_to_nodes,
+                points_to_keys,
             }
         }
     }
@@ -119,6 +128,7 @@ impl DistributedTree {
         complete
     }
 
+    /// Create a mapping between octree elements at a coarser (nodes) and finer (leaves) level.
     fn assign_nodes_to_leaves(
         leaves: &Vec<MortonKey>,
         nodes: Vec<MortonKey>,
@@ -145,6 +155,7 @@ impl DistributedTree {
         map
     }
 
+    /// Split octree nodes (blocks) by counting how many particles they contain.
     fn split_blocks(
         leaves: &Vec<MortonKey>,
         mut blocktree: Vec<MortonKey>,
@@ -275,6 +286,7 @@ impl DistributedTree {
         received_points
     }
 
+    /// Specialization for unbalanced trees.
     pub fn unbalanced_tree(
         universe: &Universe,
         points: &[[PointType; 3]],
@@ -341,6 +353,7 @@ impl DistributedTree {
         (points, map)
     }
 
+    /// Specialization for balanced trees.
     pub fn balanced_tree(
         universe: &Universe,
         points: &[[PointType; 3]],

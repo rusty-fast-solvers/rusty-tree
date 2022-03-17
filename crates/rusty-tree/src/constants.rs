@@ -1,4 +1,5 @@
-//! Crate wide constants
+//! Crate wide constants.
+
 use mpi::topology::Rank;
 use  crate::types::morton::{KeyType, MortonKey};
 

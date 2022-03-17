@@ -1,4 +1,4 @@
-// //! C API Headers
+//! C API headers.
 
 // pub mod morton;
 // pub mod helpers;

@@ -1,4 +1,4 @@
-// //! Data structures and functions for adaptive octrees.
+//! Adaptor for adaptive octrees. 
 
 // use super::{Octree, OctreeType, Statistics};
 // use ndarray::{Array1, ArrayView2, ArrayViewMut1, Axis};

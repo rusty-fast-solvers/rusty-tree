@@ -1,4 +1,4 @@
-//! Data structures and functions to create Octrees on a single node.
+//! Data structures and methods to create Octrees on a single node.
 
 use std::{
     ops::{Deref, DerefMut},
