@@ -19,6 +19,7 @@ use crate::{
     }
 };
 
+/// Interface for a distributed tree
 pub struct DistributedTree {
     pub balanced: bool,
     pub points: Vec<Point>,

@@ -724,8 +724,6 @@ mod tests {
 
         let key = MortonKey::from_point(&point, &domain);
         let direction = [1, 0, 0];
-
-        // assert!(false)
     }
 
     #[test]
