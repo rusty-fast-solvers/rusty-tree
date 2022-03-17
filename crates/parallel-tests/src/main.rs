@@ -13,6 +13,7 @@ use rusty_tree::{
 
 const NPOINTS: u64 = 10000;
 
+/// Test fixture for NPOINTS randomly distributed points.
 fn points_fixture() -> Vec<[f64; 3]> {
     let mut range = StdRng::seed_from_u64(0);
     let between = rand::distributions::Uniform::from(0.0..1.0);
@@ -28,6 +29,7 @@ fn points_fixture() -> Vec<[f64; 3]> {
     points
 }
 
+/// Test fixture for an unbalanced tree.
 fn unbalanced_tree_fixture(universe: &Universe) -> DistributedTree {
     // Experimental Parameters
     let domain = Domain {
@@ -40,6 +42,7 @@ fn unbalanced_tree_fixture(universe: &Universe) -> DistributedTree {
     DistributedTree::new(&points, &domain, false, universe)
 }
 
+/// Test fixture for an balanced tree.
 fn balanced_tree_fixture(universe: &Universe) -> DistributedTree {
     // Experimental Parameters
     let domain = Domain {
@@ -112,7 +115,7 @@ fn test_span(tree: &HashMap<MortonKey, MortonKey>) {
     }
 }
 
-
+/// Test that the leaves on separate nodes do not overlap.
 fn test_no_overlaps(universe: &Universe, tree: &HashMap<MortonKey, MortonKey>) {
 
     let world = universe.world();
@@ -148,6 +151,7 @@ fn test_no_overlaps(universe: &Universe, tree: &HashMap<MortonKey, MortonKey>) {
     }
 }
 
+/// Parallel test suite.
 fn main() {
     let universe = mpi::initialize().unwrap();
 
@@ -157,16 +161,16 @@ fn main() {
 
     // Tests for the unbalanced tree
     {
-        test_ncrit(&unbalanced.keys_to_nodes);
-        test_span(&unbalanced.keys_to_nodes);
-        test_no_overlaps(&universe, &unbalanced.keys_to_nodes);
+        test_ncrit(&unbalanced.points_to_keys);
+        test_span(&unbalanced.points_to_keys);
+        test_no_overlaps(&universe, &unbalanced.points_to_keys);
     }
 
     // Tests for the balanced tree
     {
-        test_ncrit(&balanced.keys_to_nodes);
-        test_span(&balanced.keys_to_nodes);
-        test_no_overlaps(&universe, &balanced.keys_to_nodes);
+        test_ncrit(&balanced.points_to_keys);
+        test_span(&balanced.points_to_keys);
+        test_no_overlaps(&universe, &balanced.points_to_keys);
     }
 
 }
