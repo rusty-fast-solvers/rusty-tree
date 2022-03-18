@@ -12,11 +12,14 @@ Cargo.lock
 # Python
 **/__pycache__/*
 *.py[oc]
+*.ipynb
 
 # Lib
 *.so
 
+# Rust
 build_and_test.sh
 rusty_tree/rusty_tree/*
+./crates/*/target/*
 
 .vscode/*
