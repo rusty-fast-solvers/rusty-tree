@@ -1,2 +1,0 @@
-"""Collection of helper routines."""
-
