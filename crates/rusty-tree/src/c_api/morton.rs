@@ -10,14 +10,12 @@ use crate::types::{
 #[no_mangle]
 pub extern "C" fn morton_key_from_anchor(p_anchor: *const [KeyType; 3]) -> *mut MortonKey {
     let anchor: &[KeyType; 3] = unsafe { p_anchor.as_ref().unwrap() };
-
-    get_raw(MortonKey::from_anchor(anchor))
+    Box::into_raw(Box::new(MortonKey::from_anchor(anchor)))
 }
-
 
 #[no_mangle]
 pub extern "C" fn morton_key_from_morton(morton: KeyType) -> *mut MortonKey {
-    get_raw(MortonKey::from_morton(morton))
+    Box::into_raw(Box::new(MortonKey::from_morton(morton)))
 }
 
 #[no_mangle]
@@ -35,13 +33,13 @@ pub extern "C" fn morton_key_from_point(
         diameter: diameter.to_owned(),
     };
 
-    get_raw(MortonKey::from_point(point, &domain))
+    Box::into_raw(Box::new(MortonKey::from_point(point, &domain)))
 }
 
 #[no_mangle]
 pub extern "C" fn morton_key_parent(p_morton: *mut MortonKey) -> *mut MortonKey {
     let parent = unsafe { (*p_morton).parent() };
-    get_raw(parent)
+    Box::into_raw(Box::new(parent))
 }
 
 #[no_mangle]
@@ -52,7 +50,7 @@ pub extern "C" fn morton_key_level(p_morton: *mut MortonKey) -> KeyType {
 #[no_mangle]
 pub extern "C" fn morton_key_first_child(p_morton: *mut MortonKey) -> *mut MortonKey {
     let first_child = unsafe { (*p_morton).first_child() };
-    get_raw(first_child)
+    Box::into_raw(Box::new(first_child))
 }
 
 #[no_mangle]
@@ -62,7 +60,7 @@ pub extern "C" fn morton_key_children(p_morton: *mut MortonKey, ptr: *mut usize)
     let children_boxes = unsafe { std::slice::from_raw_parts_mut(ptr, 8) };
     for index in 0..8 {
         let child = children_vec.pop().unwrap();
-        children_boxes[7 - index] = get_raw(child) as usize;
+        children_boxes[7 - index] = Box::into_raw(Box::new(child)) as usize;
     }
 }
 
@@ -125,7 +123,7 @@ pub extern "C" fn morton_key_key_in_direction(
 
     match shifted_key {
         Some(key) =>
-            get_raw(key),
+            Box::into_raw(Box::new(key)),
 
         None => std::ptr::null_mut(),
     }
@@ -153,9 +151,4 @@ pub extern "C" fn morton_key_delete(p_morton_key: *mut MortonKey) {
     unsafe {
         drop(Box::from_raw(p_morton_key));
     }
-}
-
-/// Return a raw pointer for an object
-fn get_raw(key: MortonKey) -> *mut MortonKey {
-    Box::into_raw(Box::new(key))
 }

@@ -83,7 +83,7 @@ class MortonKey(object):
         ptr = np.empty(8, dtype=np.uint64)
         ptr_data = ffi.from_buffer('uintptr_t *', ptr)
         lib.morton_key_children(self.ctype, ptr_data)
-        children = [MortonKey(ffi.cast('struct MortonKey *', ptr[index])) for index in range(8)]
+        children = [MortonKey(ffi.cast('MortonKey *', ptr[index])) for index in range(8)]
         return children
 
     def siblings(self):
@@ -117,7 +117,7 @@ class MortonKey(object):
     def box_coordinates(self, origin, diameter):
         """
         Return the 8 coordinates of the box associated with the key.
-        
+
         Let the unit cube be described as follows:
 
         [
@@ -156,7 +156,7 @@ class MortonKey(object):
         3 elements, return the key obtained by moving
         from the current key `direction[j]` steps along
         dimension [j]. For example, if `direction = [2, -1, 1]`
-        the method returns the key by moving two boxes in positive 
+        the method returns the key by moving two boxes in positive
         x-direction, one box in the negative y direction and one box
         in the positive z direction. Boxes are counted with respect to
         the current level.
