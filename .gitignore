@@ -27,3 +27,8 @@ rusty_tree/rusty_tree/*
 
 # Editor
 .vscode/*
+
+# Library files
+*.so
+*.dylib
+*.dll
