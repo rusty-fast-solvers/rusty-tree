@@ -19,6 +19,8 @@ Cargo.lock
 
 # Lib
 *.so
+*.dylib
+*.dll
 
 # Rust
 build_and_test.sh
@@ -27,8 +29,3 @@ rusty_tree/rusty_tree/*
 
 # Editor
 .vscode/*
-
-# Library files
-*.so
-*.dylib
-*.dll
