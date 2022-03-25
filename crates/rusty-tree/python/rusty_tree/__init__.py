@@ -49,13 +49,24 @@ bool morton_key_is_ancestor(MortonKey *morton, MortonKey *other);
 bool morton_key_is_descendent(MortonKey *morton, MortonKey *other);
 """
 
+constants = """
+extern int64_t DIRECTIONS[26][3];
+extern KeyType Z_LOOKUP_ENCODE[256];
+extern KeyType Z_LOOKUP_DECODE[512];
+extern KeyType Y_LOOKUP_ENCODE[256];
+extern KeyType Y_LOOKUP_DECODE[512];
+extern KeyType X_LOOKUP_ENCODE[256];
+extern KeyType X_LOOKUP_DECODE[512];
+"""
+
 ffi.cdef(types)
 ffi.cdef(methods)
+ffi.cdef(constants)
 
 lib = ffi.dlopen(os.path.join(LIBDIR,  lib_name))
 
 # Deepest Level
-DEEPEST_LEVEL = 16
+# DEEPEST_LEVEL = 16
 
 # The level displacement in a Morton index in bits
 LEVEL_DISPLACEMENT = 15
