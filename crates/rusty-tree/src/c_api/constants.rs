@@ -4,6 +4,21 @@ use crate::types::morton::KeyType;
 use crate::constants;
 
 #[no_mangle]
+pub static LEVEL_DISPLACEMENT: usize = constants::LEVEL_DISPLACEMENT;
+
+#[no_mangle]
+pub static LEVEL_MASK: KeyType = constants::LEVEL_MASK;
+
+#[no_mangle]
+pub static BYTE_MASK: KeyType = constants::BYTE_MASK;
+
+#[no_mangle]
+pub static BYTE_DISPLACEMENT: KeyType = constants::BYTE_DISPLACEMENT;
+
+#[no_mangle]
+pub static NINE_BIT_MASK: KeyType = constants::NINE_BIT_MASK;
+
+#[no_mangle]
 pub static DIRECTIONS: [[i64; 3]; 26] = constants::DIRECTIONS;
 
 #[no_mangle]

@@ -31,9 +31,26 @@ typedef struct {
     KeyType anchor[3];
     KeyType morton;
 } MortonKey;
+
+typedef struct {
+    PointType coordinate[3];
+    size_t global_idx;
+    MortonKey key;
+} Point;
+
+typedef struct {
+    PointType origin[3];
+    PointType diameter[3];
+} Domain;
+
+typedef struct {
+    bool balanced;
+    Point (*points)[];
+    MortonKey (*keys)[];
+} DistributedTree;
 """
 
-methods = """
+morton = """
 void morton_key_delete(MortonKey *key);
 MortonKey* morton_key_from_anchor(KeyType (*anchor)[3]);
 MortonKey* morton_key_from_morton(KeyType key);
@@ -49,7 +66,16 @@ bool morton_key_is_ancestor(MortonKey *morton, MortonKey *other);
 bool morton_key_is_descendent(MortonKey *morton, MortonKey *other);
 """
 
+distributed = """
+Tree* tree_from_morton_keys(KeyType *data, size_t len);
+"""
+
 constants = """
+extern size_t LEVEL_DISPLACEMENT;
+extern KeyType LEVEL_MASK;
+extern KeyType BYTE_MASK;
+extern KeyType BYTE_DISPLACEMENT;
+extern KeyType NINE_BIT_MASK;
 extern int64_t DIRECTIONS[26][3];
 extern KeyType Z_LOOKUP_ENCODE[256];
 extern KeyType Z_LOOKUP_DECODE[512];
@@ -60,13 +86,12 @@ extern KeyType X_LOOKUP_DECODE[512];
 """
 
 ffi.cdef(types)
-ffi.cdef(methods)
+ffi.cdef(morton)
+ffi.cdef(distributed)
 ffi.cdef(constants)
 
 lib = ffi.dlopen(os.path.join(LIBDIR,  lib_name))
 
-# Deepest Level
-# DEEPEST_LEVEL = 16
 
 # The level displacement in a Morton index in bits
 LEVEL_DISPLACEMENT = 15

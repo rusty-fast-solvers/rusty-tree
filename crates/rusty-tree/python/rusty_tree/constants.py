@@ -23,3 +23,4 @@ K = 2
 NCRIT = 150
 DEEPEST_LEVEL = 16
 ROOT = MortonKey.from_morton(np.uint64(0))
+LEVEL_SIZE = 1 << DEEPEST_LEVEL

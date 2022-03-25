@@ -1,9 +1,9 @@
-"""Data Structures for Morton indices."""
+"""Data Structure for Morton Key."""
 import numpy as np
 from rusty_tree import lib, ffi
 
 
-class MortonKey(object):
+class MortonKey:
     """
     Definition of a Morton Key
     """

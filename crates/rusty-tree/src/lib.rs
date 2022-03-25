@@ -18,11 +18,9 @@
 //! [4] Chan, T. "Closest-point problems simplified on the RAM", ACM-SIAM Symposium on Discrete
 //! Algorithms (2002)
 
-pub mod adaptive;
 pub mod c_api;
 pub mod constants;
 pub mod distributed;
 pub mod helpers;
 pub mod single_node;
 pub mod types;
-pub mod regular;
