@@ -100,16 +100,14 @@ fn main () {
     let comm: UserCommunicator = universe.world();
     let comm = comm.split_by_color(Color::with_value(0)).unwrap();
 
-    // Calculate the global domain defined by the distributed points
-    let domain: Domain = Domain::from_global_points(&points, &comm);
 
     // Generate a distributed tree
 
     // Unbalanced
-    let unbalanced: DistributedTree = DistributedTree::new(&points, &domain, false, &universe)
+    let unbalanced: DistributedTree = DistributedTree::new(&points, false, &comm)
 
     // Balanced
-    let balanced_tree: DistributedTree = DistributedTree::new(&points, &domain, true, &universe)
+    let balanced_tree: DistributedTree = DistributedTree::new(&points, true, &cpmm)
 }
 ```
 
