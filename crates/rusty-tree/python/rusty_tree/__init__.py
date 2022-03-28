@@ -72,9 +72,9 @@ bool morton_key_is_ancestor(MortonKey *morton, MortonKey *other);
 bool morton_key_is_descendent(MortonKey *morton, MortonKey *other);
 """
 
-# distributed = """
-# Tree* tree_from_morton_keys(KeyType *data, size_t len);
-# """
+distributed = """
+Tree* tree_from_morton_keys(KeyType *data, size_t len);
+"""
 
 domain = """
 Domain* domain_from_local_points(PointType (*point)[][3], size_t len);
@@ -103,14 +103,11 @@ void cleanup(MPI_Comm);
 ffi.cdef(types)
 ffi.cdef(morton)
 ffi.cdef(domain)
+ffi.cdef(mpi)
+# ffi.cdef(distributed)
 ffi.cdef(constants)
 
 lib = ffi.dlopen(os.path.join(LIBDIR,  lib_name))
-
-
-# The level displacement in a Morton index in bits
-LEVEL_DISPLACEMENT = 15
-
 
 
 class MPI_Comm:
@@ -148,3 +145,6 @@ class MPI_Comm:
     @property
     def ptr(self):
         return self._instance.ptr
+
+    def __del__(self):
+        lib.cleanup(self._instance.raw)
