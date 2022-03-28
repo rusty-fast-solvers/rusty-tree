@@ -8,7 +8,6 @@ use rand::SeedableRng;
 use rusty_tree::{
     constants::{NCRIT, ROOT},
     distributed::DistributedTree,
-    helpers::compute_global_domain,
     types::{domain::Domain, morton::MortonKey},
 };
 
@@ -35,7 +34,7 @@ fn unbalanced_tree_fixture(universe: &Universe) -> DistributedTree {
     let points = points_fixture();
     let comm = universe.world();
     let comm = comm.split_by_color(Color::with_value(0)).unwrap();
-    let domain = compute_global_domain(&points, &comm);
+    let domain = Domain::from_global_points(&points, &comm);
 
     DistributedTree::new(&points, &domain, false, universe)
 }
@@ -45,7 +44,7 @@ fn balanced_tree_fixture(universe: &Universe) -> DistributedTree {
     let points = points_fixture();
     let comm = universe.world();
     let comm = comm.split_by_color(Color::with_value(0)).unwrap();
-    let domain = compute_global_domain(&points, &comm);
+    let domain = Domain::from_global_points(&points, &comm);
 
     DistributedTree::new(&points, &domain, true, universe)
 }
@@ -155,7 +154,7 @@ fn test_global_bounds(universe: &Universe) {
     let comm = universe.world();
     let comm = comm.split_by_color(Color::with_value(0)).unwrap();
 
-    let domain = compute_global_domain(&points, &comm);
+    let domain = Domain::from_global_points(&points, &comm);
 
     // Test that all local points are contained within the global domain
     for point in points {

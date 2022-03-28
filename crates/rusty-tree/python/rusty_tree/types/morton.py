@@ -15,13 +15,11 @@ class MortonKey:
         This constructor should not be used outside the class. Instead
         use the provided class methods to construct a MortonKey object.
         """
-
         self._p_key = p_key
 
     @property
     def ctype(self):
         """Give access to the underlying ctype."""
-
         return self._p_key
 
     @property

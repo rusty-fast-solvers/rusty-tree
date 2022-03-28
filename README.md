@@ -53,7 +53,7 @@ fn main () {
     let comm = comm.split_by_color(Color::with_value(0)).unwrap();
     
     // Calculate the global domain defined by the distributed points
-    let domain: Domain = compute_global_domain(&points, &comm);
+    let domain: Domain = Domain::from_global_points(&points, &comm);
 
     // Generate a distributed tree
 

@@ -23,31 +23,37 @@ else:
 
 ffi = FFI()
 
-types = """
+if MPI._sizeof(MPI.Comm) == ffi.sizeof('int'):
+    _mpi_comm_t = 'int'
+else:
+    _mpi_comm_t = 'void*'
+
+types =f"""
 typedef uint64_t KeyType;
 typedef double PointType;
+typedef {_mpi_comm_t} MPI_Comm;
 
-typedef struct {
+typedef struct {{
     KeyType anchor[3];
     KeyType morton;
-} MortonKey;
+}} MortonKey;
 
-typedef struct {
+typedef struct {{
     PointType coordinate[3];
     size_t global_idx;
     MortonKey key;
-} Point;
+}} Point;
 
-typedef struct {
+typedef struct {{
     PointType origin[3];
     PointType diameter[3];
-} Domain;
+}} Domain;
 
-typedef struct {
+typedef struct {{
     bool balanced;
     Point (*points)[];
     MortonKey (*keys)[];
-} DistributedTree;
+}} DistributedTree;
 """
 
 morton = """
@@ -66,8 +72,13 @@ bool morton_key_is_ancestor(MortonKey *morton, MortonKey *other);
 bool morton_key_is_descendent(MortonKey *morton, MortonKey *other);
 """
 
-distributed = """
-Tree* tree_from_morton_keys(KeyType *data, size_t len);
+# distributed = """
+# Tree* tree_from_morton_keys(KeyType *data, size_t len);
+# """
+
+domain = """
+Domain* domain_from_local_points(PointType (*point)[][3], size_t len);
+Domain* domain_from_global_points(PointType (*point)[][3], size_t len, MPI_Comm comm);
 """
 
 constants = """
@@ -85,9 +96,13 @@ extern KeyType X_LOOKUP_ENCODE[256];
 extern KeyType X_LOOKUP_DECODE[512];
 """
 
+mpi = """
+void cleanup(MPI_Comm);
+"""
+
 ffi.cdef(types)
 ffi.cdef(morton)
-ffi.cdef(distributed)
+ffi.cdef(domain)
 ffi.cdef(constants)
 
 lib = ffi.dlopen(os.path.join(LIBDIR,  lib_name))
