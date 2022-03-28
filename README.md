@@ -33,7 +33,7 @@ comm = MPI_Comm()
 # Generate a random set of points
 points = np.random.rand(1000000, 3)
 
-# Bsalanced Tree
+# Balanced Tree
 balanced = DistributedTree.from_global_points(points, True, comm)
 
 # Unbalanced Tree
