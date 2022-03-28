@@ -1,4 +1,4 @@
-from setuptools import setup, dist
+from setuptools import setup, dist, find_packages
 
 # Python build requirements
 requirements = []
@@ -9,9 +9,11 @@ class BinaryDistribution(dist.Distribution):
 
 setup(
     name='rusty_tree',
-    version='0.0.1',
+    version='0.0.4',
     descripion='Python Bindings for Rusty Trees',
-    packages=['rusty_tree'],
+    packages=find_packages(
+        exclude=['*.test']
+    ),
     include_package_data=True,
     package_data={
         'rusty_tree': ['lib/librusty_tree.so']

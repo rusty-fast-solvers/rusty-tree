@@ -7,11 +7,10 @@ Implementation of Octrees [1] in Rust with Python interfaces.
 Install and use from Anaconda, relies on a working MPI implementation on your system.
 
 ```bash
-pip install -r crates/rusty-tree/python/requirements.txt \&&
-conda install -c skailasa rusty_tree
+pip install -r requirements.txt && conda install -c skailasa rusty_tree
 ```
 
-## Build 
+## Build
 
 ```bash
 # only tested with py38 so far
@@ -20,7 +19,7 @@ conda build crates/rusty-tree/python/conda.recipe --python=3.8
 
 ## Usage
 
-Write a script: 
+Write a script:
 
 ```python
 # Called script.py
@@ -31,7 +30,7 @@ from rusty_tree import MPI_Comm
 from rusty_tree.distributed import DistributedTree
 
 # Initialize a global communicator
-comm = MPI_Comm() 
+comm = MPI_Comm()
 
 # Generate a random set of points
 points = np.random.rand(1000000, 3)
@@ -65,7 +64,7 @@ use rand::prelude::*;
 use rand::SeedableRng;
 
 use mpi::{
-    environment::Universe, 
+    environment::Universe,
     topology::{Color, UserCommunicator},
     traits::*
 };
@@ -76,7 +75,7 @@ use rusty_tree::{
     types::{
         domain::Domain,
         morton::MortonKey
-        point::PointType, 
+        point::PointType,
     },
 };
 
@@ -100,7 +99,7 @@ fn main () {
     let universe: Universe = mpi::initialize().unwrap();
     let comm: UserCommunicator = universe.world();
     let comm = comm.split_by_color(Color::with_value(0)).unwrap();
-    
+
     // Calculate the global domain defined by the distributed points
     let domain: Domain = Domain::from_global_points(&points, &comm);
 

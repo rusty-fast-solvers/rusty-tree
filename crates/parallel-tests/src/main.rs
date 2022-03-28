@@ -34,9 +34,8 @@ fn unbalanced_tree_fixture(universe: &Universe) -> DistributedTree {
     let points = points_fixture();
     let comm = universe.world();
     let mut comm = comm.split_by_color(Color::with_value(0)).unwrap();
-    let domain = Domain::from_global_points(&points, &comm);
 
-    DistributedTree::new(&points, &domain, false, &mut comm)
+    DistributedTree::new(&points, false, &mut comm)
 }
 
 /// Test fixture for an balanced tree.
@@ -44,9 +43,8 @@ fn balanced_tree_fixture(universe: &Universe) -> DistributedTree {
     let points = points_fixture();
     let comm = universe.world();
     let mut comm = comm.split_by_color(Color::with_value(0)).unwrap();
-    let domain = Domain::from_global_points(&points, &comm);
 
-    DistributedTree::new(&points, &domain, true, &mut comm)
+    DistributedTree::new(&points, true, &mut comm)
 }
 
 /// Test that the tree satisfies the ncrit condition.

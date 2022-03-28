@@ -130,7 +130,7 @@ class MPI_Comm:
             MPI_Comm._instance = MPI_Comm._Singleton()
         else:
             pass
-    
+
     def __del__(self):
         lib.cleanup(self._instance.raw)
 

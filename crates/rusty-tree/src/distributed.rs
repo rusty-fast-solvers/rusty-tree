@@ -24,13 +24,13 @@ use crate::{
 pub struct DistributedTree {
     /// Balancing is optional.
     pub balanced: bool,
-    
+
     ///  A vector of Cartesian points.
     pub points: Vec<Point>,
-    
-    /// Map between the point's minimum leaf encoding, and the nodes in the tree. 
+
+    /// Map between the point's minimum leaf encoding, and the nodes in the tree.
     pub points_to_keys: HashMap<MortonKey, MortonKey>,
-    
+
     /// The nodes that span the tree, define it's leaf nodes.
     pub keys: Vec<MortonKey>
 }
@@ -39,7 +39,7 @@ impl DistributedTree {
 
     /// Create a new DistributedOctree from a set of distributed points which define a domain.
     pub fn new(points: &[[PointType; 3]], balanced: bool, comm: &mut UserCommunicator) -> DistributedTree {
-        
+
         let domain = Domain::from_global_points(&points, &comm);
         let comm = SystemCommunicator::world();
         let mut comm = comm.split_by_color(Color::with_value(0)).unwrap();
@@ -181,7 +181,7 @@ impl DistributedTree {
                 if let std::collections::hash_map::Entry::Vacant(e) = blocks_to_npoints.entry(block) {
                     e.insert(1);
                 } else if let Some(b) = blocks_to_npoints.get_mut(&block) {
-                        *b += 1;       
+                        *b += 1;
                 }
             }
 
