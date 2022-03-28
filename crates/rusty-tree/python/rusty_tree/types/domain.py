@@ -41,5 +41,5 @@ class Domain:
         npoints, _ = points.shape
         points_data = ffi.from_buffer(f"double(*)[][3]", points)
         n_points_data= ffi.cast('size_t', npoints)
-        return cls(lib.domain_from_global_points(points_data, npoints, comm))
+        return cls(lib.domain_from_global_points(points_data, npoints, comm.raw))
     

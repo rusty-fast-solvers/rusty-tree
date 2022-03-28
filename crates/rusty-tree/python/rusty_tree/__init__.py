@@ -73,7 +73,7 @@ bool morton_key_is_descendent(MortonKey *morton, MortonKey *other);
 """
 
 distributed = """
-Tree* tree_from_morton_keys(KeyType *data, size_t len);
+DistributedTree* distributed_tree_from_points(PointType (*point)[][3], size_t npoints, bool balanced, MPI_Comm comm);
 """
 
 domain = """
@@ -104,7 +104,7 @@ ffi.cdef(types)
 ffi.cdef(morton)
 ffi.cdef(domain)
 ffi.cdef(mpi)
-# ffi.cdef(distributed)
+ffi.cdef(distributed)
 ffi.cdef(constants)
 
 lib = ffi.dlopen(os.path.join(LIBDIR,  lib_name))
