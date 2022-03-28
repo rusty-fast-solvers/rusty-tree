@@ -36,8 +36,6 @@ pub extern "C" fn distributed_tree_from_points(
 ) -> *mut DistributedTree {
     let points = unsafe { std::slice::from_raw_parts(p_points, npoints) }; 
     let mut comm = std::mem::ManuallyDrop::new(unsafe {UserCommunicator::from_raw(comm)}.unwrap());
-    println!("HERE {:?}", balanced);
-    // let universe = Universe::world();
     Box::into_raw(Box::new(DistributedTree::new(points, balanced, &mut comm)))
 }
 

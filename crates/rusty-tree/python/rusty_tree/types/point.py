@@ -1,8 +1,5 @@
 import numpy as np
 
-from rusty_tree import lib
-from rusty_tree.types.morton import MortonKey
-
 
 class Point:
 
