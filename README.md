@@ -100,9 +100,6 @@ fn main () {
     let comm: UserCommunicator = universe.world();
     let comm = comm.split_by_color(Color::with_value(0)).unwrap();
 
-
-    // Generate a distributed tree
-
     // Unbalanced
     let unbalanced: DistributedTree = DistributedTree::new(&points, false, &comm)
 
