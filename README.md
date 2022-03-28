@@ -20,12 +20,15 @@ conda build crates/rusty-tree/python/conda.recipe --python=3.8
 
 ## Usage
 
+Write a script: 
+
 ```python
+# Called script.py
+
 import numpy as np
 
 from rusty_tree import MPI_Comm
 from rusty_tree.distributed import DistributedTree
-
 
 # Initialize a global communicator
 comm = MPI_Comm() 
@@ -40,6 +43,11 @@ balanced = DistributedTree.from_global_points(points, True, comm)
 unbalanced = DistributedTree.from_global_points(points, False, comm)
 ```
 
+Run a script using mpi4py (specified in requirements)
+
+```bash
+mpiexec -n <nprocs> python -m mpi4py script.py
+```
 
 # Rust Library
 
