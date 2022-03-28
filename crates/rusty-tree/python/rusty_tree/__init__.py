@@ -112,9 +112,39 @@ lib = ffi.dlopen(os.path.join(LIBDIR,  lib_name))
 LEVEL_DISPLACEMENT = 15
 
 
+
 class MPI_Comm:
-    """Interface for raw/wrapped communicator"""
-    def __init__(self, comm):
-        self.comm = comm
-        self.ptr = MPI._addressof(self.comm)
-        self.val = ffi.cast('MPI_Comm*', self.ptr)[0]
+
+    _instance = None
+
+    class _Singleton:
+        def __init__(self):
+            self.comm = MPI.COMM_WORLD
+            self.ptr = MPI._addressof(self.comm)
+            self.raw = ffi.cast('MPI_Comm*', self.ptr)[0]
+
+    def __init__(self):
+        if not MPI_Comm._instance:
+            MPI_Comm._instance = MPI_Comm._Singleton()
+        else:
+            pass
+
+    @property
+    def rank(self):
+        return self._instance.comm.rank
+
+    @property
+    def size(self):
+        return self._instance.comm.size
+
+    @property
+    def raw(self):
+        return self._instance.raw
+
+    @property
+    def comm(self):
+        return self._instance.comm
+
+    @property
+    def ptr(self):
+        return self._instance.ptr
