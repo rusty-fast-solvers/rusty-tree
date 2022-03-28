@@ -2,6 +2,47 @@
 
 Implementation of Octrees [1] in Rust with Python interfaces.
 
+# Python Library
+
+Install and use from Anaconda, relies on a working MPI implementation on your system.
+
+```bash
+pip install -r crates/rusty-tree/python/requirements.txt \&&
+conda install -c skailasa rusty_tree
+```
+
+## Build 
+
+```bash
+# only tested with py38 so far
+conda build crates/rusty-tree/python/conda.recipe --python=3.8
+```
+
+## Usage
+
+```python
+import numpy as np
+
+from rusty_tree import MPI_Comm
+from rusty_tree.distributed import DistributedTree
+
+
+# Initialize a global communicator
+comm = MPI_Comm() 
+
+# Generate a random set of points
+points = np.random.rand(1000000, 3)
+
+# Bsalanced Tree
+balanced = DistributedTree.from_global_points(points, True, comm)
+
+# Unbalanced Tree
+unbalanced = DistributedTree.from_global_points(points, False, comm)
+```
+
+
+# Rust Library
+
 ## Build
 
 ```bash
@@ -9,7 +50,7 @@ Implementation of Octrees [1] in Rust with Python interfaces.
 cargo build
 ```
 
-## Usage
+## Usage
 
 ```rust
 use rand::prelude::*;
