@@ -16,6 +16,13 @@ class MortonKey:
         use the provided class methods to construct a MortonKey object.
         """
         self._p_key = p_key
+    
+    def __del__(self):
+        """Destructor to ensure that the C memory is cleaned up."""
+        lib.morton_key_delete(self.ctype)
+
+    def __repr__(self):
+        return str({"morton": self.morton, "anchor": self.anchor})
 
     @property
     def ctype(self):
@@ -62,10 +69,6 @@ class MortonKey:
         diameter_data = ffi.from_buffer("double(*)[3]", diameter)
 
         return cls(lib.morton_key_from_point(point_data, origin_data, diameter_data))
-
-    def __del__(self):
-        """Destructor to ensure that the C memory is cleaned up."""
-        lib.morton_key_delete(self.ctype)
 
     def parent(self):
         """Return the parent."""

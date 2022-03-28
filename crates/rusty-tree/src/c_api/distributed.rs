@@ -9,9 +9,12 @@ use crate::{
     distributed::DistributedTree,
     types::{
         domain::Domain,
-        point::PointType
+        point::PointType,
+        morton::MortonKey
     }
 };
+
+use std::ptr;
 
 // pub struct Universe {
 //     pub buffer: Vec<u8>
@@ -33,8 +36,33 @@ pub extern "C" fn distributed_tree_from_points(
 ) -> *mut DistributedTree {
     let points = unsafe { std::slice::from_raw_parts(p_points, npoints) }; 
     let mut comm = std::mem::ManuallyDrop::new(unsafe {UserCommunicator::from_raw(comm)}.unwrap());
-    let domain = Domain::from_global_points(points, &comm);
-
+    println!("HERE {:?}", balanced);
     // let universe = Universe::world();
-    Box::into_raw(Box::new(DistributedTree::new(points, &domain, balanced, &mut *comm)))
+    Box::into_raw(Box::new(DistributedTree::new(points, balanced, &mut comm)))
+}
+
+#[no_mangle]
+pub extern "C" fn distributed_tree_n_keys(
+    p_tree: *const DistributedTree,
+) -> usize {
+    let mut tree = unsafe { &*p_tree };
+    tree.keys.len()
+}
+
+
+#[no_mangle]
+pub extern "C" fn distributed_tree_keys(
+    p_tree: *const DistributedTree,
+    ptr: *mut usize
+) {
+    let mut tree = unsafe { &*p_tree };
+    let mut keys = &tree.keys;
+    let nkeys = keys.len();
+
+    let boxes = unsafe {std::slice::from_raw_parts_mut(ptr, nkeys)};
+
+    for index in 0..nkeys {
+        let key = keys[index].clone();
+        boxes[index] = Box::into_raw(Box::new(key)) as usize;
+    }
 }

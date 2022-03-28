@@ -38,10 +38,13 @@ pub struct DistributedTree {
 impl DistributedTree {
 
     /// Create a new DistributedOctree from a set of distributed points which define a domain.
-    pub fn new(points: &[[PointType; 3]], domain: &Domain, balanced: bool, comm: &mut UserCommunicator) -> DistributedTree {
-
-        // if balanced
-            let (points, points_to_keys) = DistributedTree::balanced_tree(comm, points, domain);
+    pub fn new(points: &[[PointType; 3]], balanced: bool, comm: &mut UserCommunicator) -> DistributedTree {
+        
+        let domain = Domain::from_global_points(&points, &comm);
+        let comm = SystemCommunicator::world();
+        let mut comm = comm.split_by_color(Color::with_value(0)).unwrap();
+        if balanced  {
+            let (points, points_to_keys) = DistributedTree::balanced_tree(&mut comm, points, &domain);
             let keys = points.iter().map(|p| p.key).collect();
 
             DistributedTree {
@@ -50,20 +53,17 @@ impl DistributedTree {
                 keys,
                 points_to_keys,
             }
+        } else {
+            let (points, points_to_keys) = DistributedTree::unbalanced_tree(&mut comm, points, &domain);
+            let keys = points.iter().map(|p| p.key).collect();
 
-        
-    //     } else {
-    //         let (points, points_to_keys) = DistributedTree::unbalanced_tree(comm, points, domain);
-    //         let keys = points.iter().map(|p| p.key).collect();
-
-    //         DistributedTree {
-    //             balanced,
-    //             points,
-    //             keys,
-    //             points_to_keys,
-    //         }
-    //     }
-    // }
+            DistributedTree {
+                balanced,
+                points,
+                keys,
+                points_to_keys,
+            }
+        }
     }
 
     /// Complete a distributed block tree from the seed octants, algorithm 4 in [1] (parallel).
@@ -294,9 +294,7 @@ impl DistributedTree {
         mut comm: &mut UserCommunicator,
         points: &[[PointType; 3]],
         domain: &Domain,
-    )
-    //  -> (Vec<Point>, HashMap<MortonKey, MortonKey>) {
-    {
+    ) -> (Vec<Point>, HashMap<MortonKey, MortonKey>) {
 
         let rank = comm.rank();
         let size = comm.size();
@@ -312,49 +310,48 @@ impl DistributedTree {
         hyksort(&mut points, K, &mut comm);
 
         // 2.ii Find unique leaf keys on each processor and place in a Tree
-        // let keys: Vec<MortonKey> = points
-        //     .iter()
-        //     .map(|p| p.key)
-        //     .collect();
+        let keys: Vec<MortonKey> = points
+            .iter()
+            .map(|p| p.key)
+            .collect();
 
-    //     let mut tree = Tree {keys};
+        let mut tree = Tree {keys};
 
-    //     // 3. Linearise received keys (remove overlaps if they exist).
-    //     tree.linearize();
+        // 3. Linearise received keys (remove overlaps if they exist).
+        tree.linearize();
 
-    //     let comm = SystemCommunicator::world();
-    //     let comm = comm.split_by_color(Color::with_value(0)).unwrap();
+        let comm = SystemCommunicator::world();
+        let comm = comm.split_by_color(Color::with_value(0)).unwrap();
 
-    //     // 4. Complete region spanned by node.
-    //     tree.complete();
+        // 4. Complete region spanned by node.
+        tree.complete();
 
-    //     // 5. Find seeds and compute the coarse blocktree
-    //     let mut seeds = DistributedTree::find_seeds(&tree.keys);
+        // 5. Find seeds and compute the coarse blocktree
+        let mut seeds = DistributedTree::find_seeds(&tree.keys);
 
-    //     let blocktree = DistributedTree::complete_blocktree(
-    //         &mut seeds,
-    //         &rank,
-    //         &size,
-    //         &comm
-    //     );
+        let blocktree = DistributedTree::complete_blocktree(
+            &mut seeds,
+            &rank,
+            &size,
+            &comm
+        );
 
-    //     // 5.ii any data below the min seed sent to partner process
-    //     let points = DistributedTree::transfer_points_to_blocktree(
-    //         &comm,
-    //         &points,
-    //         &seeds,
-    //         &rank,
-    //         &size
-    //     );
+        // 5.ii any data below the min seed sent to partner process
+        let points = DistributedTree::transfer_points_to_blocktree(
+            &comm,
+            &points,
+            &seeds,
+            &rank,
+            &size
+        );
 
-    //     // 6. Refine blocks based on ncrit
-    //     let map = DistributedTree::split_blocks(
-    //         &points.iter().map(|p| p.key).collect(),
-    //         blocktree.keys
-    //     );
+        // 6. Refine blocks based on ncrit
+        let map = DistributedTree::split_blocks(
+            &points.iter().map(|p| p.key).collect(),
+            blocktree.keys
+        );
 
-        // (points, map)
-    // }
+        (points, map)
     }
 
     /// Specialization for balanced trees.
