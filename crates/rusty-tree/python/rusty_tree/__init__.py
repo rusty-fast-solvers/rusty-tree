@@ -75,7 +75,10 @@ bool morton_key_is_descendent(MortonKey *morton, MortonKey *other);
 distributed = """
 DistributedTree* distributed_tree_from_points(PointType (*point)[][3], size_t npoints, int balanced, MPI_Comm comm);
 size_t distributed_tree_n_keys(DistributedTree*);
+size_t distributed_tree_n_points(DistributedTree*);
+bool distributed_tree_balanced(DistributedTree*);
 void distributed_tree_keys(DistributedTree*, uintptr_t *ptr);
+void distributed_tree_points(DistributedTree*, uintptr_t *ptr);
 """
 
 domain = """
@@ -127,6 +130,9 @@ class MPI_Comm:
             MPI_Comm._instance = MPI_Comm._Singleton()
         else:
             pass
+    
+    def __del__(self):
+        lib.cleanup(self._instance.raw)
 
     @property
     def rank(self):
@@ -147,6 +153,3 @@ class MPI_Comm:
     @property
     def ptr(self):
         return self._instance.ptr
-
-    # def __del__(self):
-    #     lib.cleanup(self._instance.raw)

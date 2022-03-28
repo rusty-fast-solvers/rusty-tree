@@ -49,6 +49,13 @@ pub extern "C" fn distributed_tree_n_keys(
     tree.keys.len()
 }
 
+#[no_mangle]
+pub extern "C" fn distributed_tree_n_points(
+    p_tree: *const DistributedTree,
+) -> usize {
+    let mut tree = unsafe { &*p_tree };
+    tree.points.len()
+}
 
 #[no_mangle]
 pub extern "C" fn distributed_tree_keys(
@@ -65,4 +72,29 @@ pub extern "C" fn distributed_tree_keys(
         let key = keys[index].clone();
         boxes[index] = Box::into_raw(Box::new(key)) as usize;
     }
+}
+
+#[no_mangle]
+pub extern "C" fn distributed_tree_points(
+    p_tree: *const DistributedTree,
+    ptr: *mut usize
+) {
+    let mut tree = unsafe { &*p_tree };
+    let mut points = &tree.points;
+    let npoints = points.iter().len();
+
+    let boxes = unsafe {std::slice::from_raw_parts_mut(ptr, npoints)};
+
+    for index in 0..npoints {
+        let point = points[index].clone();
+        boxes[index] = Box::into_raw(Box::new(point)) as usize;
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn distributed_tree_balanced(
+    p_tree: *const DistributedTree,
+) -> bool {
+    let mut tree = unsafe { &*p_tree };
+    tree.balanced
 }
