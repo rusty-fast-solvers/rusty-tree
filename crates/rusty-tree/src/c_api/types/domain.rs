@@ -26,4 +26,3 @@ pub extern "C" fn domain_from_global_points(p_points: *const [PointType; 3], len
 
     Box::into_raw(Box::new(domain))
 }
-

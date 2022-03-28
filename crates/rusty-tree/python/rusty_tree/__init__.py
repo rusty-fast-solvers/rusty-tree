@@ -110,3 +110,11 @@ lib = ffi.dlopen(os.path.join(LIBDIR,  lib_name))
 
 # The level displacement in a Morton index in bits
 LEVEL_DISPLACEMENT = 15
+
+
+class MPI_Comm:
+    """Interface for raw/wrapped communicator"""
+    def __init__(self, comm):
+        self.comm = comm
+        self.ptr = MPI._addressof(self.comm)
+        self.val = ffi.cast('MPI_Comm*', self.ptr)[0]
