@@ -104,7 +104,7 @@ fn main () {
     let unbalanced: DistributedTree = DistributedTree::new(&points, false, &comm)
 
     // Balanced
-    let balanced_tree: DistributedTree = DistributedTree::new(&points, true, &cpmm)
+    let balanced_tree: DistributedTree = DistributedTree::new(&points, true, &comm)
 }
 ```
 
