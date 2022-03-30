@@ -31,7 +31,7 @@ class Domain:
     def from_local_points(cls, points):
         points = np.array(points, dtype=np.float64, order='C')
         npoints, _ = points.shape
-        points_data = ffi.from_buffer(f"double(*)[][3]", points)
+        points_data = ffi.from_buffer(f"double(*)[3]", points)
         n_points_data= ffi.cast('size_t', npoints)
         return cls(lib.domain_from_local_points(points_data, npoints))
 
@@ -39,7 +39,7 @@ class Domain:
     def from_global_points(cls, points, comm):
         points = np.array(points, dtype=np.float64, order='C')
         npoints, _ = points.shape
-        points_data = ffi.from_buffer(f"double(*)[][3]", points)
+        points_data = ffi.from_buffer(f"double(*)[3]", points)
         n_points_data= ffi.cast('size_t', npoints)
-        return cls(lib.domain_from_global_points(points_data, npoints, comm.raw))
+        return cls(lib.domain_from_global_points(points_data, npoints, comm))
     

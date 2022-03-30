@@ -16,26 +16,15 @@ use crate::{
 
 use std::ptr;
 
-// pub struct Universe {
-//     pub buffer: Vec<u8>
-// }
-
-// impl Universe {
-//     fn world(&self) -> SystemCommunicator {
-//         SystemCommunicator::world()
-//     }
-// }
-
-
 #[no_mangle]
 pub extern "C" fn distributed_tree_from_points(
     p_points: *const [PointType; 3],
     npoints: usize,
     balanced: bool,
-    comm: MPI_Comm
+    comm: *mut usize
 ) -> *mut DistributedTree {
     let points = unsafe { std::slice::from_raw_parts(p_points, npoints) }; 
-    let mut comm = std::mem::ManuallyDrop::new(unsafe {UserCommunicator::from_raw(comm)}.unwrap());
+    let mut comm = std::mem::ManuallyDrop::new(unsafe {UserCommunicator::from_raw(*comm as MPI_Comm)}.unwrap());
     Box::into_raw(Box::new(DistributedTree::new(points, balanced, &mut comm)))
 }
 

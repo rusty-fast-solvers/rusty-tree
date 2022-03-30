@@ -1,7 +1,7 @@
 import numpy as np
 
 from rusty_tree import ffi, lib
-from rusty_tree.morton import MortonKey
+from rusty_tree.types.morton import MortonKey
 
 def load_cbuffer(c_buffer, shape, dtype):
     size = 8

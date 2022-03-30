@@ -22,24 +22,25 @@ class MortonKey:
         lib.morton_key_delete(self.ctype)
 
     def __repr__(self):
-        return str({"morton": self.morton, "anchor": self.anchor})
+        return str(self.ctype)
+        # return str({"morton": self.morton, "anchor": self.anchor})
 
     @property
     def ctype(self):
         """Give access to the underlying ctype."""
         return self._p_key
 
-    @property
+    # @property
     def anchor(self):
         """Return the anchor."""
         return np.array([*self.ctype.anchor], dtype=np.uint64)
 
-    @property
+    # @property
     def morton(self):
         """Return the Morton index."""
         return self.ctype.morton
 
-    @property
+    # @property
     def level(self):
         """Return the level."""
         return lib.morton_key_level(self.ctype)

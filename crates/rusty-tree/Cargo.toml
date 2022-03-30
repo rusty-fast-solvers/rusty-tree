@@ -7,7 +7,6 @@ description = "Octree data structures in Rust."
 license = "BSD-3-Clause"
 homepage = "https://github.com/rusty-fast-solvers/rusty-tree"
 repository = "https://github.com/rusty-fast-solvers/rusty-tree"
-readme = "README.md"
 keywords = ["numerics"]
 categories = ["mathematics", "science"]
 
