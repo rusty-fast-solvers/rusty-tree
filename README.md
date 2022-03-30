@@ -7,14 +7,13 @@ Implementation of Octrees [1] in Rust with Python interfaces.
 Install and use from Anaconda, relies on a working MPI implementation on your system.
 
 ```bash
-pip install -r requirements.txt && conda install -c skailasa rusty_tree
+conda install -c skailasa rusty_tree
 ```
 
 ## Build
 
 ```bash
-# only tested with py38 so far
-conda build crates/rusty-tree/python/conda.recipe --python=3.8
+cd crates/rusty-tree/ && maturin develop --release
 ```
 
 ## Usage
@@ -22,30 +21,26 @@ conda build crates/rusty-tree/python/conda.recipe --python=3.8
 Write a script:
 
 ```python
-# Called script.py
-
+from mpi4py import MPI
 import numpy as np
 
-from rusty_tree import MPI_Comm
+from rusty_tree import ffi
 from rusty_tree.distributed import DistributedTree
 
-# Initialize a global communicator
-comm = MPI_Comm()
+comm = MPI.COMM_WORLD
+ptr = MPI._addressof(comm)
+raw = ffi.cast('uintptr_t*', ptr)
 
-# Generate a random set of points
-points = np.random.rand(1000000, 3)
+points = np.random.rand(100000, 3)
 
-# Balanced Tree
-balanced = DistributedTree.from_global_points(points, True, comm)
-
-# Unbalanced Tree
-unbalanced = DistributedTree.from_global_points(points, False, comm)
+balanced = DistributedTree.from_global_points(points, True, raw)
+print(comm.size, comm.rank)
 ```
 
 Run a script using mpi4py (specified in requirements)
 
 ```bash
-mpiexec -n <nprocs> python -m mpi4py script.py
+mpiexec -n <nprocs> python -m mpi4py /path/to/script/
 ```
 
 # Rust Library
