@@ -11,7 +11,7 @@ use rusty_tree::{
     types::{domain::Domain, morton::MortonKey},
 };
 
-const NPOINTS: u64 = 10000;
+const NPOINTS: u64 = 1000000;
 
 /// Test fixture for NPOINTS randomly distributed points.
 fn points_fixture() -> Vec<[f64; 3]> {
@@ -167,25 +167,25 @@ fn main() {
     let universe = mpi::initialize().unwrap();
 
     // Distributed Trees
-    let unbalanced = unbalanced_tree_fixture(&universe);
+    // let unbalanced = unbalanced_tree_fixture(&universe);
     let balanced = balanced_tree_fixture(&universe);
 
-    // Tests for the unbalanced tree
-    {
-        test_ncrit(&unbalanced.points_to_keys);
-        test_span(&unbalanced.points_to_keys);
-        test_no_overlaps(&universe, &unbalanced.points_to_keys);
-    }
+    // // Tests for the unbalanced tree
+    // {
+    //     test_ncrit(&unbalanced.points_to_keys);
+    //     test_span(&unbalanced.points_to_keys);
+    //     test_no_overlaps(&universe, &unbalanced.points_to_keys);
+    // }
 
-    // Tests for the balanced tree
-    {
-        test_ncrit(&balanced.points_to_keys);
-        test_span(&balanced.points_to_keys);
-        test_no_overlaps(&universe, &balanced.points_to_keys);
-    }
+    // // Tests for the balanced tree
+    // {
+    //     test_ncrit(&balanced.points_to_keys);
+    //     test_span(&balanced.points_to_keys);
+    //     test_no_overlaps(&universe, &balanced.points_to_keys);
+    // }
 
-    // Other parallel functionality
-    {
-        test_global_bounds(&universe);
-    }
+    // // Other parallel functionality
+    // {
+    //     test_global_bounds(&universe);
+    // }
 }

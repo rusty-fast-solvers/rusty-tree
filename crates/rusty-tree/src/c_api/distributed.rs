@@ -14,6 +14,9 @@ use crate::{
     }
 };
 
+use rand::prelude::*;
+use rand::SeedableRng;
+
 use std::ptr;
 
 #[no_mangle]
@@ -26,6 +29,30 @@ pub extern "C" fn distributed_tree_from_points(
     let points = unsafe { std::slice::from_raw_parts(p_points, npoints) }; 
     let mut comm = std::mem::ManuallyDrop::new(unsafe {UserCommunicator::from_raw(*comm as MPI_Comm)}.unwrap());
     Box::into_raw(Box::new(DistributedTree::new(points, balanced, &mut comm)))
+}
+
+
+#[no_mangle]
+pub extern "C" fn distributed_tree_random(
+    balanced: bool,
+    npoints: usize,
+    comm: *mut usize
+) -> *mut DistributedTree {
+
+    let mut range = StdRng::seed_from_u64(0);
+    let between = rand::distributions::Uniform::<f64>::from(0.0..1.0);
+    let mut points = Vec::new();
+
+    for _ in 0..npoints {
+        points.push([
+            between.sample(&mut range),
+            between.sample(&mut range),
+            between.sample(&mut range),
+        ])
+    };
+
+    let mut comm = std::mem::ManuallyDrop::new(unsafe {UserCommunicator::from_raw(*comm as MPI_Comm)}.unwrap());
+    Box::into_raw(Box::new(DistributedTree::new(&points, balanced, &mut comm)))
 }
 
 #[no_mangle]
@@ -45,36 +72,40 @@ pub extern "C" fn distributed_tree_n_points(
 }
 
 #[no_mangle]
-pub extern "C" fn distributed_tree_keys(
+pub extern "C" fn distributed_tree_keys_slice(
     p_tree: *const DistributedTree,
-    ptr: *mut usize
+    ptr: *mut usize,
+    lidx: usize,
+    ridx: usize
 ) {
-    let mut tree = unsafe { &*p_tree };
-    let mut keys = &tree.keys;
-    let nkeys = keys.len();
+    let tree = unsafe { &*p_tree };
+    let nkeys = ridx-lidx;
 
     let boxes = unsafe {std::slice::from_raw_parts_mut(ptr, nkeys)};
 
-    for index in 0..nkeys {
-        let key = keys[index].clone();
-        boxes[index] = Box::into_raw(Box::new(key)) as usize;
+    for i in 0..nkeys {
+        let j = i+lidx;
+        let key = tree.keys[j].clone();
+        boxes[i] = Box::into_raw(Box::new(key)) as usize;
     }
 }
 
 #[no_mangle]
-pub extern "C" fn distributed_tree_points(
+pub extern "C" fn distributed_tree_points_slice(
     p_tree: *const DistributedTree,
-    ptr: *mut usize
+    ptr: *mut usize,
+    lidx: usize,
+    ridx: usize
 ) {
-    let mut tree = unsafe { &*p_tree };
-    let mut points = &tree.points;
-    let npoints = points.iter().len();
+    let tree = unsafe { &*p_tree };
+    let npoints = ridx-lidx;
 
     let boxes = unsafe {std::slice::from_raw_parts_mut(ptr, npoints)};
 
-    for index in 0..npoints {
-        let point = points[index].clone();
-        boxes[index] = Box::into_raw(Box::new(point)) as usize;
+    for i in 0..npoints {
+        let j = i+lidx;
+        let point = tree.points[j].clone();
+        boxes[i] = Box::into_raw(Box::new(point)) as usize;
     }
 }
 
@@ -82,6 +113,6 @@ pub extern "C" fn distributed_tree_points(
 pub extern "C" fn distributed_tree_balanced(
     p_tree: *const DistributedTree,
 ) -> bool {
-    let mut tree = unsafe { &*p_tree };
+    let tree = unsafe { &*p_tree };
     tree.balanced
 }

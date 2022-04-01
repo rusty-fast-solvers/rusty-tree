@@ -33,10 +33,10 @@ class Point:
     def __repr__(self):
         return str(
             {
-                "coordinate": self.coordinate, 
-                "global_idx": self.global_idx,
-                "key": self.morton,
-                "anchor": self.anchor
+                "coordinate": self.coordinate(), 
+                "global_idx": self.global_idx(),
+                "key": self.morton(),
+                "anchor": self.anchor()
             }
         )
 
@@ -45,21 +45,19 @@ class Point:
         """Give access to the underlying ctype."""
         return self._p_point
 
-    @property
     def coordinate(self):
         """Return the coordinate."""
         return np.array([*self.ctype.coordinate], dtype=np.float64)
     
-    @property
     def global_idx(self):
         """Return the coordinate."""
         return self.ctype.global_idx
 
-    @property
     def morton(self):
         """Return the associated Morton key"""
         return self.ctype.key.morton
 
-    @property
     def anchor(self):
         return np.array([*self.ctype.key.anchor], dtype=np.uint64)
+
+    

@@ -22,28 +22,36 @@ class MortonKey:
         lib.morton_key_delete(self.ctype)
 
     def __repr__(self):
-        return str(self.ctype)
-        # return str({"morton": self.morton, "anchor": self.anchor})
+        return str({"morton": self.morton(), "anchor": self.anchor()})
+
+    def __eq__(self, other):
+        """Implement == operator."""
+        return self.morton == other.morton
+
+    def __ne__(self, other):
+        """Implement != operator."""
+        return self.morton != other.morton
+
+    def __lt__(self, other):
+        """Implement < operator."""
+        return self.morton < other.morton
+
+    def __le__(self, other):
+        """Implement <= operator."""
+        return self.morton <= other.morton
+
+    def __gt__(self, other):
+        """Implement > operator."""
+        return self.morton > other.morton
+
+    def __ge__(self, other):
+        """Implement >= operator."""
+        return self.morton >= other.morton
 
     @property
     def ctype(self):
         """Give access to the underlying ctype."""
         return self._p_key
-
-    # @property
-    def anchor(self):
-        """Return the anchor."""
-        return np.array([*self.ctype.anchor], dtype=np.uint64)
-
-    # @property
-    def morton(self):
-        """Return the Morton index."""
-        return self.ctype.morton
-
-    # @property
-    def level(self):
-        """Return the level."""
-        return lib.morton_key_level(self.ctype)
 
     @classmethod
     def from_anchor(cls, anchor):
@@ -70,6 +78,19 @@ class MortonKey:
         diameter_data = ffi.from_buffer("double(*)[3]", diameter)
 
         return cls(lib.morton_key_from_point(point_data, origin_data, diameter_data))
+    
+    def anchor(self):
+        """Return the anchor."""
+        return np.array([*self.ctype.anchor], dtype=np.uint64)
+
+    def morton(self):
+        """Return the Morton index."""
+        return self.ctype.morton
+
+    def level(self):
+        """Return the level."""
+        return lib.morton_key_level(self.ctype)
+
 
     def parent(self):
         """Return the parent."""
@@ -101,7 +122,6 @@ class MortonKey:
         """Check if the key is descendent of `other`."""
 
         return lib.morton_key_is_descendent(self.ctype, other.ctype)
-
 
     def to_coordinates(self, origin, diameter):
         """Return the coordinates of the anchor."""
@@ -140,7 +160,6 @@ class MortonKey:
         coords = np.empty(24, dtype=np.float64)
         coords_data = ffi.from_buffer("double(*)[24]", coords)
 
-
         origin = np.array(origin, dtype=np.float64)
         origin_data = ffi.from_buffer("double(*)[3]", origin)
         diameter = np.array(diameter, dtype=np.float64)
@@ -177,28 +196,4 @@ class MortonKey:
             return None
         else:
             return MortonKey(ptr)
-
-    def __eq__(self, other):
-        """Implement == operator."""
-        return self.morton == other.morton
-
-    def __ne__(self, other):
-        """Implement != operator."""
-        return self.morton != other.morton
-
-    def __lt__(self, other):
-        """Implement < operator."""
-        return self.morton < other.morton
-
-    def __le__(self, other):
-        """Implement <= operator."""
-        return self.morton <= other.morton
-
-    def __gt__(self, other):
-        """Implement > operator."""
-        return self.morton > other.morton
-
-    def __ge__(self, other):
-        """Implement >= operator."""
-        return self.morton >= other.morton
 
