@@ -48,6 +48,9 @@ class MortonKey:
         """Implement >= operator."""
         return self.morton >= other.morton
 
+    def __hash__(self):
+        return self.morton()
+
     @property
     def ctype(self):
         """Give access to the underlying ctype."""
@@ -91,10 +94,8 @@ class MortonKey:
         """Return the level."""
         return lib.morton_key_level(self.ctype)
 
-
     def parent(self):
         """Return the parent."""
-
         return MortonKey(lib.morton_key_parent(self.ctype))
 
     def first_child(self):
@@ -109,13 +110,21 @@ class MortonKey:
         children = [MortonKey(ffi.cast('MortonKey *', ptr[index])) for index in range(8)]
         return children
 
+    def ancestors(self):
+        curr = self
+        ancestors = set()
+        while curr.morton() != 0:
+            parent = curr.parent()
+            ancestors.add(parent)
+            curr = parent
+        return ancestors
+
     def siblings(self):
         """Return all children of the parent."""
         return self.parent().children()
 
     def is_ancestor(self, other):
         """Check if the key is ancestor of `other`."""
-
         return lib.morton_key_is_ancestor(self.ctype, other.ctype)
 
     def is_descendent(self, other):
