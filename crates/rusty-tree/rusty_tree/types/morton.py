@@ -4,10 +4,6 @@ from rusty_tree import lib, ffi
 
 
 class MortonKey:
-    """
-    Definition of a Morton Key
-    """
-
     def __init__(self, p_key):
         """
         Initialize from a pointer to a Morton key.
@@ -129,7 +125,6 @@ class MortonKey:
 
     def is_descendent(self, other):
         """Check if the key is descendent of `other`."""
-
         return lib.morton_key_is_descendent(self.ctype, other.ctype)
 
     def to_coordinates(self, origin, diameter):
@@ -205,4 +200,3 @@ class MortonKey:
             return None
         else:
             return MortonKey(ptr)
-

@@ -152,3 +152,38 @@ pub extern "C" fn morton_key_delete(p_morton_key: *mut MortonKey) {
         drop(Box::from_raw(p_morton_key));
     }
 }
+
+#[no_mangle]
+pub extern "C" fn morton_key_next(ptr: *const MortonKey) -> *mut &'static MortonKey {
+    let mut slice = unsafe {std::slice::from_raw_parts(ptr, 2).iter()};
+    slice.next();
+    let next = slice.next().unwrap();
+    Box::into_raw(Box::new(next))
+}
+
+
+#[no_mangle]
+pub extern "C" fn morton_key_slice(
+    p_keys: *const MortonKey,
+    ptr: *mut usize,
+    nkeys: usize,
+    lidx: usize,
+    ridx: usize
+) {
+    let mut keys = unsafe {std::slice::from_raw_parts(p_keys, nkeys).iter()};
+    let mut i = 0;
+
+    while i < lidx {
+        keys.next();
+        i += 1;
+    }
+
+    let nslice = ridx-lidx;
+    
+    let boxes = unsafe {std::slice::from_raw_parts_mut(ptr, nslice)};
+
+    for i in 0..nslice {
+        let key = keys.next().unwrap().clone();
+        boxes[i] = Box::into_raw(Box::new(key)) as usize;
+    }
+}
