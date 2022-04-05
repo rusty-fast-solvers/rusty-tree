@@ -161,29 +161,28 @@ pub extern "C" fn morton_key_next(ptr: *const MortonKey) -> *mut &'static Morton
     Box::into_raw(Box::new(next))
 }
 
-
 #[no_mangle]
 pub extern "C" fn morton_key_slice(
-    p_keys: *const MortonKey,
-    ptr: *mut usize,
-    nkeys: usize,
-    lidx: usize,
-    ridx: usize
+    ptr: *const MortonKey,
+    data_ptr: *mut usize,
+    len: usize,
+    start: usize,
+    stop: usize
 ) {
-    let mut keys = unsafe {std::slice::from_raw_parts(p_keys, nkeys).iter()};
-    let mut i = 0;
+    let slice = unsafe {std::slice::from_raw_parts(ptr, len)};
 
-    while i < lidx {
-        keys.next();
-        i += 1;
-    }
-
-    let nslice = ridx-lidx;
+    let nslice = stop-start;
+    let boxes = unsafe {std::slice::from_raw_parts_mut(data_ptr, nslice)};
     
-    let boxes = unsafe {std::slice::from_raw_parts_mut(ptr, nslice)};
-
-    for i in 0..nslice {
-        let key = keys.next().unwrap().clone();
-        boxes[i] = Box::into_raw(Box::new(key)) as usize;
+    let mut jdx = 0; 
+    for idx in start..stop {
+        boxes[jdx] = Box::into_raw(Box::new(slice[idx])) as usize;
+        jdx += 1;
     }
+}
+
+#[no_mangle]
+pub extern "C" fn morton_key_index(ptr: *const MortonKey, len: usize, idx: usize) -> *mut &'static MortonKey {
+    let slice = unsafe {std::slice::from_raw_parts(ptr, len)};
+    Box::into_raw(Box::new(&slice[idx]))
 }

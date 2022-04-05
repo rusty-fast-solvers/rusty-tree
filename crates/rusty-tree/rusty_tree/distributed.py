@@ -12,9 +12,9 @@ class DistributedTree:
     def __init__(self, p_tree):
         self.ctype = p_tree
         self.nkeys = lib.distributed_tree_nkeys(self.ctype)
-        self.keys = Iterator(lib.distributed_tree_keys(self.ctype), self.nkeys, MortonKey)
+        self.keys = Iterator.from_keys(lib.distributed_tree_keys(self.ctype), self.nkeys)
         self.npoints = lib.distributed_tree_npoints(self.ctype)
-        self.points = Iterator(lib.distributed_tree_points(self.ctype), self.npoints, Point)
+        self.points = Iterator.from_points(lib.distributed_tree_points(self.ctype), self.npoints)
         self.balanced = lib.distributed_tree_balanced(self.ctype)
 
     @classmethod

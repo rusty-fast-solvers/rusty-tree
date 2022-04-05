@@ -12,6 +12,6 @@ points = np.random.rand(10, 3)
 tree = DistributedTree.from_global_points(points, True, raw)
 
 
-# tree = DistributedTree.random(True, 100000, raw)
-# print(comm.size, comm.rank, tree.nkeys, tree.balanced)
-print(tree.ctype)
+print(tree.keys[:1])
+
+print(tree.points[0:1])
