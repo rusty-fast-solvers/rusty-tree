@@ -60,24 +60,3 @@ class Point:
 
     def anchor(self):
         return np.array([*self.ctype.key.anchor], dtype=np.uint64)
-
-
-class Iterator():
-
-    def __init__(self, pointer, n, type):
-        self._pointer = pointer
-        self._n = n
-        self._head = pointer
-        self._curr = self._head
-        self._iter = 0
-        self._n = n
-        self.type = type
- 
-    @classmethod
-    def from_points(cls, pointer, n):
-        cls(pointer, n, Point)
-
-    @classmethod
-    def from_keys(cls, pointer, n):
-        cls(pointer, n, MortonKey)
- 
