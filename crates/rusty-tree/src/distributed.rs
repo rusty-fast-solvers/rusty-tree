@@ -41,7 +41,7 @@ impl DistributedTree {
     pub fn new(points: &[[PointType; 3]], balanced: bool, world: &UserCommunicator) -> DistributedTree {
 
         let domain = Domain::from_global_points(&points, world);
-     
+
         if balanced  {
             let (points, points_to_keys) = DistributedTree::balanced_tree(world, points, &domain);
             let keys = points.iter().map(|p| p.key).collect();
@@ -306,7 +306,8 @@ impl DistributedTree {
             .collect();
 
         // 2.i Perform parallel Morton sort over encoded points
-        hyksort(&mut points, K, world);
+        let mut comm = world.duplicate();
+        hyksort(&mut points, K, comm);
 
         // 2.ii Find unique leaf keys on each processor and place in a Tree
         let keys: Vec<MortonKey> = points
@@ -360,7 +361,7 @@ impl DistributedTree {
         // Create a distributed unbalanced tree;
         let rank = world.rank();
         let size = world.size();
-        
+
         // 1. Encode Points to Leaf Morton Keys, add a global index related to the processor
         let mut points: Vec<Point> = points
             .iter()
@@ -369,7 +370,8 @@ impl DistributedTree {
             .collect();
 
         // 2.i Perform parallel Morton sort over encoded points
-        hyksort(&mut points, K, world);
+        let mut comm = world.duplicate();
+        hyksort(&mut points, K, comm);
 
         // 2.ii Find unique leaf keys on each processor and place in a Tree
         let keys: Vec<MortonKey> = points
@@ -432,7 +434,8 @@ impl DistributedTree {
             .collect();
 
         // 8. Perform another distributed sort
-        hyksort(&mut points, K, world);
+        let mut comm = world.duplicate();
+        hyksort(&mut points, K, comm);
 
         // 9. Remove local overlaps
         let keys: Vec<MortonKey> = points

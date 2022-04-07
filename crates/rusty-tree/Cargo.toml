@@ -20,4 +20,4 @@ itertools = "0.10"
 mpi = { git = "https://github.com/rsmpi/rsmpi", branch = "main"}
 memoffset = "0.6"
 rand = "0.8.4"
-hyksort = {git = "https://github.com/skailasa/hyksort", branch = "tmp"}
+hyksort = {git = "https://github.com/skailasa/hyksort", branch = "main"}
