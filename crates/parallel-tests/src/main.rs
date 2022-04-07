@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use mpi::{environment::Universe, topology::Color, traits::*};
+use mpi::{environment::Universe, topology::{Color, SystemCommunicator}, traits::*};
 
 use rand::prelude::*;
 use rand::SeedableRng;
@@ -11,7 +11,7 @@ use rusty_tree::{
     types::{domain::Domain, morton::MortonKey},
 };
 
-const NPOINTS: u64 = 1000000;
+const NPOINTS: u64 = 1000;
 
 /// Test fixture for NPOINTS randomly distributed points.
 fn points_fixture() -> Vec<[f64; 3]> {
@@ -30,21 +30,19 @@ fn points_fixture() -> Vec<[f64; 3]> {
 }
 
 /// Test fixture for an unbalanced tree.
-fn unbalanced_tree_fixture(universe: &Universe) -> DistributedTree {
+fn unbalanced_tree_fixture(world: &SystemCommunicator) -> DistributedTree {
     let points = points_fixture();
-    let comm = universe.world();
-    let mut comm = comm.split_by_color(Color::with_value(0)).unwrap();
+    let comm = world.duplicate();
 
-    DistributedTree::new(&points, false, &mut comm)
+    DistributedTree::new(&points, false, &comm)
 }
 
 /// Test fixture for an balanced tree.
-fn balanced_tree_fixture(universe: &Universe) -> DistributedTree {
+fn balanced_tree_fixture(world: &SystemCommunicator) -> DistributedTree {
     let points = points_fixture();
-    let comm = universe.world();
-    let mut comm = comm.split_by_color(Color::with_value(0)).unwrap();
+    let comm = world.duplicate();
 
-    DistributedTree::new(&points, true, &mut comm)
+    DistributedTree::new(&points, true, &comm)
 }
 
 /// Test that the tree satisfies the ncrit condition.
@@ -108,9 +106,7 @@ fn test_span(tree: &HashMap<MortonKey, MortonKey>) {
 }
 
 /// Test that the leaves on separate nodes do not overlap.
-fn test_no_overlaps(universe: &Universe, tree: &HashMap<MortonKey, MortonKey>) {
-
-    let world = universe.world();
+fn test_no_overlaps(world: &SystemCommunicator, tree: &HashMap<MortonKey, MortonKey>) {
 
     // Communicate bounds from each process
     let max = tree.iter().map(|(_, block)| block).max().unwrap();
@@ -145,12 +141,11 @@ fn test_no_overlaps(universe: &Universe, tree: &HashMap<MortonKey, MortonKey>) {
 
 
 /// Test that the globally defined domain contains all the points at a given node.
-fn test_global_bounds(universe: &Universe) {
+fn test_global_bounds(world: &SystemCommunicator) {
 
     let points = points_fixture();
 
-    let comm = universe.world();
-    let comm = comm.split_by_color(Color::with_value(0)).unwrap();
+    let comm = world.duplicate();
 
     let domain = Domain::from_global_points(&points, &comm);
 
@@ -165,27 +160,41 @@ fn test_global_bounds(universe: &Universe) {
 /// Parallel test suite.
 fn main() {
     let universe = mpi::initialize().unwrap();
+    let world = universe.world();
+    let rank = world.rank();
 
     // Distributed Trees
-    // let unbalanced = unbalanced_tree_fixture(&universe);
-    let balanced = balanced_tree_fixture(&universe);
+    let unbalanced = unbalanced_tree_fixture(&world);
+    let balanced = balanced_tree_fixture(&world);
 
-    // // Tests for the unbalanced tree
-    // {
-    //     test_ncrit(&unbalanced.points_to_keys);
-    //     test_span(&unbalanced.points_to_keys);
-    //     test_no_overlaps(&universe, &unbalanced.points_to_keys);
-    // }
+    // Tests for the unbalanced tree
+    test_ncrit(&unbalanced.points_to_keys);
+    println!("test_ncrit ... passed for unbalanced trees");
 
-    // // Tests for the balanced tree
-    // {
-    //     test_ncrit(&balanced.points_to_keys);
-    //     test_span(&balanced.points_to_keys);
-    //     test_no_overlaps(&universe, &balanced.points_to_keys);
-    // }
+    test_span(&unbalanced.points_to_keys);
+    println!("test_span ... passed for unbalanced trees");
 
-    // // Other parallel functionality
-    // {
-    //     test_global_bounds(&universe);
-    // }
+    test_no_overlaps(&world, &unbalanced.points_to_keys);
+    if rank == 0 {
+        println!("test_no_overlaps ... passed for unbalanced trees");
+    }
+
+    // Tests for the balanced tree
+    test_ncrit(&balanced.points_to_keys);
+    println!("test_ncrit ... passed for unbalanced trees");
+
+    test_span(&balanced.points_to_keys);
+    println!("test_span ... passed for unbalanced trees");
+
+    test_no_overlaps(&world, &balanced.points_to_keys);
+    if rank == 0 {
+        println!("test_no_overlaps ... passed for balanced trees");
+    }
+
+    // Other parallel functionality
+    test_global_bounds(&world);
+    if rank == 0 {
+        println!("test_global_bounds ... passed");
+    }
+
 }
