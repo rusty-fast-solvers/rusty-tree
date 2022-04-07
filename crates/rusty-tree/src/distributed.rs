@@ -38,13 +38,12 @@ pub struct DistributedTree {
 impl DistributedTree {
 
     /// Create a new DistributedOctree from a set of distributed points which define a domain.
-    pub fn new(points: &[[PointType; 3]], balanced: bool, comm: &mut UserCommunicator) -> DistributedTree {
+    pub fn new(points: &[[PointType; 3]], balanced: bool, world: &UserCommunicator) -> DistributedTree {
 
-        let domain = Domain::from_global_points(&points, &comm);
-        let comm = SystemCommunicator::world();
-        let mut comm = comm.split_by_color(Color::with_value(0)).unwrap();
+        let domain = Domain::from_global_points(&points, world);
+     
         if balanced  {
-            let (points, points_to_keys) = DistributedTree::balanced_tree(&mut comm, points, &domain);
+            let (points, points_to_keys) = DistributedTree::balanced_tree(world, points, &domain);
             let keys = points.iter().map(|p| p.key).collect();
 
             DistributedTree {
@@ -54,7 +53,7 @@ impl DistributedTree {
                 points_to_keys,
             }
         } else {
-            let (points, points_to_keys) = DistributedTree::unbalanced_tree(&mut comm, points, &domain);
+            let (points, points_to_keys) = DistributedTree::unbalanced_tree(world, points, &domain);
             let keys = points.iter().map(|p| p.key).collect();
 
             DistributedTree {
@@ -236,7 +235,7 @@ impl DistributedTree {
 
     // Transfer points based on the coarse distributed blocktree [REFERENCE ALGORITHM]
     fn transfer_points_to_blocktree(
-        comm: &UserCommunicator,
+        world: &UserCommunicator,
         points: &[Point],
         seeds: &[MortonKey],
         &rank: &Rank,
@@ -264,15 +263,15 @@ impl DistributedTree {
                 .collect();
 
             let msg_size: Rank = msg.len() as Rank;
-            comm.process_at_rank(prev_rank).send(&msg_size);
-            comm.process_at_rank(prev_rank).send(&msg[..]);
+            world.process_at_rank(prev_rank).send(&msg_size);
+            world.process_at_rank(prev_rank).send(&msg[..]);
         }
 
         if rank < (size - 1) {
             let mut bufsize = 0;
-            comm.process_at_rank(next_rank).receive_into(&mut bufsize);
+            world.process_at_rank(next_rank).receive_into(&mut bufsize);
             let mut buffer = vec![Point::default(); bufsize as usize];
-            comm.process_at_rank(next_rank).receive_into(&mut buffer[..]);
+            world.process_at_rank(next_rank).receive_into(&mut buffer[..]);
             received_points.append(&mut buffer);
         }
 
@@ -291,13 +290,13 @@ impl DistributedTree {
 
     /// Specialization for unbalanced trees.
     pub fn unbalanced_tree(
-        mut comm: &mut UserCommunicator,
+        world: &UserCommunicator,
         points: &[[PointType; 3]],
         domain: &Domain,
     ) -> (Vec<Point>, HashMap<MortonKey, MortonKey>) {
 
-        let rank = comm.rank();
-        let size = comm.size();
+        let rank = world.rank();
+        let size = world.size();
 
         // 1. Encode Points to Leaf Morton Keys, add a global index related to the processor
         let mut points: Vec<Point> = points
@@ -307,7 +306,7 @@ impl DistributedTree {
             .collect();
 
         // 2.i Perform parallel Morton sort over encoded points
-        hyksort(&mut points, K, &mut comm);
+        hyksort(&mut points, K, world);
 
         // 2.ii Find unique leaf keys on each processor and place in a Tree
         let keys: Vec<MortonKey> = points
@@ -320,9 +319,6 @@ impl DistributedTree {
         // 3. Linearise received keys (remove overlaps if they exist).
         tree.linearize();
 
-        let comm = SystemCommunicator::world();
-        let comm = comm.split_by_color(Color::with_value(0)).unwrap();
-
         // 4. Complete region spanned by node.
         tree.complete();
 
@@ -333,12 +329,12 @@ impl DistributedTree {
             &mut seeds,
             &rank,
             &size,
-            &comm
+            world
         );
 
         // 5.ii any data below the min seed sent to partner process
         let points = DistributedTree::transfer_points_to_blocktree(
-            &comm,
+            world,
             &points,
             &seeds,
             &rank,
@@ -356,17 +352,15 @@ impl DistributedTree {
 
     /// Specialization for balanced trees.
     pub fn balanced_tree(
-        mut comm: &mut UserCommunicator,
+        world: &UserCommunicator,
         points: &[[PointType; 3]],
         domain: &Domain,
     ) -> (Vec<Point>, HashMap<MortonKey, MortonKey>) {
 
         // Create a distributed unbalanced tree;
-        // let comm = SystemCommunicator::world();
-        // let mut comm = comm.split_by_color(Color::with_value(0)).unwrap();
-        let rank = comm.rank();
-        let size = comm.size();
-
+        let rank = world.rank();
+        let size = world.size();
+        
         // 1. Encode Points to Leaf Morton Keys, add a global index related to the processor
         let mut points: Vec<Point> = points
             .iter()
@@ -375,7 +369,7 @@ impl DistributedTree {
             .collect();
 
         // 2.i Perform parallel Morton sort over encoded points
-        hyksort(&mut points, K, &mut comm);
+        hyksort(&mut points, K, world);
 
         // 2.ii Find unique leaf keys on each processor and place in a Tree
         let keys: Vec<MortonKey> = points
@@ -388,9 +382,6 @@ impl DistributedTree {
         // 3. Linearise received keys (remove overlaps if they exist).
         tree.linearize();
 
-        let comm = SystemCommunicator::world();
-        let comm = comm.split_by_color(Color::with_value(0)).unwrap();
-
         // 4. Complete region spanned by node.
         tree.complete();
 
@@ -401,12 +392,12 @@ impl DistributedTree {
             &mut seeds,
             &rank,
             &size,
-            &comm
+            world
         );
 
         // 5.ii Send data below the min seed sent to partner process
         let points = DistributedTree::transfer_points_to_blocktree(
-            &comm,
+            world,
             &points,
             &seeds,
             &rank,
@@ -441,9 +432,7 @@ impl DistributedTree {
             .collect();
 
         // 8. Perform another distributed sort
-        let comm = SystemCommunicator::world();
-        let mut comm = comm.split_by_color(Color::with_value(0)).unwrap();
-        hyksort(&mut points, K, &mut comm);
+        hyksort(&mut points, K, world);
 
         // 9. Remove local overlaps
         let keys: Vec<MortonKey> = points
