@@ -3,8 +3,7 @@
 use std::collections::{HashSet, HashMap};
 
 use mpi::{
-    topology::{Color, Rank, UserCommunicator, SystemCommunicator},
-    environment::Universe,
+    topology::{Rank, UserCommunicator},
     traits::*
 };
 
@@ -306,7 +305,7 @@ impl DistributedTree {
             .collect();
 
         // 2.i Perform parallel Morton sort over encoded points
-        let mut comm = world.duplicate();
+        let comm = world.duplicate();
         hyksort(&mut points, K, comm);
 
         // 2.ii Find unique leaf keys on each processor and place in a Tree
@@ -370,7 +369,7 @@ impl DistributedTree {
             .collect();
 
         // 2.i Perform parallel Morton sort over encoded points
-        let mut comm = world.duplicate();
+        let comm = world.duplicate();
         hyksort(&mut points, K, comm);
 
         // 2.ii Find unique leaf keys on each processor and place in a Tree
@@ -434,7 +433,7 @@ impl DistributedTree {
             .collect();
 
         // 8. Perform another distributed sort
-        let mut comm = world.duplicate();
+        let comm = world.duplicate();
         hyksort(&mut points, K, comm);
 
         // 9. Remove local overlaps

@@ -9,26 +9,26 @@ class IteratorProtocol:
     """
     Wrapper for a Rust Iterator protocol.
     """
-    def __init__(self, type, c_name, slice, next, index):
-        self.p_type = type
+    def __init__(self, p_type, c_name, clone, next, index):
+        self.p_type = p_type
         self.c_name = c_name
-        self.slice = slice
+        self.clone = clone
         self.next = next
         self.index = index
 
 MortonProtocol = IteratorProtocol(
-    MortonKey, 
-    'MortonKey', 
-    lib.morton_key_slice, 
-    lib.morton_key_next, 
+    MortonKey,
+    'MortonKey',
+    lib.morton_key_clone,
+    lib.morton_key_next,
     lib.morton_key_index
 )
 
 PointProtocol = IteratorProtocol(
-    Point, 
-    'Point', 
-    lib.point_slice, 
-    lib.point_next, 
+    Point,
+    'Point',
+    lib.point_clone,
+    lib.point_next,
     lib.point_index
 )
 
@@ -52,7 +52,7 @@ class Iterator:
     @classmethod
     def from_keys(cls, pointer, n):
         return cls(pointer, n, MortonProtocol)
- 
+
     def __len__(self):
         return self._n
 
@@ -72,26 +72,14 @@ class Iterator:
                 return _curr
         else:
             raise StopIteration
-    
+
     def __repr__(self):
-        nslice = len(self)
-        n = ffi.cast('size_t', len(self))
-        start = ffi.cast('size_t', 0)
-        stop = ffi.cast('size_t', n)
-        ptr = np.empty(nslice, dtype=np.uint64)
-        ptr_data = ffi.from_buffer('uintptr_t *', ptr)
-        self.iterator_protocol.slice(self._head, ptr_data, n, start, stop)
-        return str([
-            self.iterator_protocol.p_type(
-           ffi.cast(f'{self.iterator_protocol.c_name} *', ptr[index])
-           )
-           for index in range(nslice)
-           ])
+        return str(self._clone(0, len(self)))
 
     @property
     def head(self):
         return self.iterator_protocol.p_type(self._head)
-    
+
     @property
     def ctype(self):
         return self._head
@@ -101,15 +89,29 @@ class Iterator:
         ntot = ffi.cast('size_t', len(self))
         return self.iterator_protocol.index(self._head, ntot, index)
 
+    def _clone(self, start, stop):
+        """Clone a slice into a Python datatype"""
+        n = ffi.cast('size_t', len(self))
+        nslice = stop-start
+        start = ffi.cast('size_t', start)
+        stop = ffi.cast('size_t', stop)
+        ptr = np.empty(nslice, dtype=np.uint64)
+        ptr_data = ffi.from_buffer('uintptr_t *', ptr)
+        self.iterator_protocol.clone(self._head, ptr_data, n, start, stop)
+        return [
+            self.iterator_protocol.p_type(ffi.cast(f'{self.iterator_protocol.c_name} *', ptr[index]))
+            for index in range(nslice)
+            ]
+
     def _slice(self, start, stop):
         nslice = stop-start
         ptr = self._index(start)[0]
-        return Iterator(ptr, nslice, self.iterator_protocol) 
-    
+        return Iterator(ptr, nslice, self.iterator_protocol)
+
     def __getitem__(self, key):
         if isinstance(key, slice):
             start, stop, _ = key.indices(len(self))
-            return self._slice(start, stop)    
+            return self._slice(start, stop)
 
         elif isinstance(key, int):
             ptr = self._slice(key, key+1)

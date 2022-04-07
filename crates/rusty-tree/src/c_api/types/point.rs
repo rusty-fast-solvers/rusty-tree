@@ -10,7 +10,7 @@ pub extern "C" fn point_next(ptr: *const Point) -> *mut &'static Point {
 }
 
 #[no_mangle]
-pub extern "C" fn point_slice(
+pub extern "C" fn point_clone(
     ptr: *const Point,
     data_ptr: *mut usize,
     len: usize,
@@ -21,8 +21,8 @@ pub extern "C" fn point_slice(
 
     let nslice = stop-start;
     let boxes = unsafe {std::slice::from_raw_parts_mut(data_ptr, nslice)};
-    
-    let mut jdx = 0; 
+
+    let mut jdx = 0;
     for idx in start..stop {
         boxes[jdx] = Box::into_raw(Box::new(slice[idx])) as usize;
         jdx += 1;

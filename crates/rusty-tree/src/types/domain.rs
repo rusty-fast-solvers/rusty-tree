@@ -1,21 +1,16 @@
 //! Definition of basic types
-
 use memoffset::offset_of;
+
 use mpi::{
     traits::*,
     Address,
     datatype::{
         Equivalence, UncommittedUserDatatype, UserDatatype
     },
-    topology::{Rank, UserCommunicator}
+    topology::UserCommunicator
 };
 
-use crate::{
-    types::{
-        morton::{MortonKey, KeyType},
-        point::PointType
-    }
-};
+use crate::types::point::PointType;
 
 #[derive(Debug, Clone, Default)]
 pub struct Domain {
@@ -25,7 +20,7 @@ pub struct Domain {
 
 
 impl Domain {
-    
+
     /// Compute the domain defined by a set of points on a local node.
     pub fn from_local_points(points: &[[PointType; 3]]) -> Domain {
 
@@ -60,7 +55,7 @@ impl Domain {
         let min_z = buffer.iter().min_by(|a, b| a.origin[2].partial_cmp(&b.origin[2]).unwrap()).unwrap().origin[2];
 
         let min_origin = [min_x, min_y, min_z];
-        
+
         // Find maximum origin
         let max_x = buffer.iter().max_by(|a, b| a.origin[0].partial_cmp(&b.origin[0]).unwrap()).unwrap().origin[0];
         let max_y = buffer.iter().max_by(|a, b| a.origin[1].partial_cmp(&b.origin[1]).unwrap()).unwrap().origin[1];
@@ -74,7 +69,7 @@ impl Domain {
         let max_z = buffer.iter().max_by(|a, b| a.diameter[2].partial_cmp(&b.diameter[2]).unwrap()).unwrap().diameter[2];
 
         let max_diameter = [max_origin[0]+max_x, max_origin[1]+max_y, max_origin[2]+max_z];
-        
+
         Domain {
             origin: min_origin,
             diameter: max_diameter,
@@ -109,7 +104,7 @@ mod tests {
 
     use rand::prelude::*;
     use rand::SeedableRng;
-    
+
     use crate::{
         constants::{NCRIT, ROOT},
         distributed::DistributedTree,
@@ -118,7 +113,7 @@ mod tests {
             morton::MortonKey
         },
     };
-    
+
     const NPOINTS: u64 = 100000;
 
     #[test]
@@ -138,7 +133,7 @@ mod tests {
         }
 
         let domain = Domain::from_local_points(&points);
-        
+
         // Test that all local points are contained within the local domain
         for point in points {
             assert!(domain.origin[0] <= point[0] && point[0] <= domain.origin[0]+domain.diameter[0]);

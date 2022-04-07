@@ -8,7 +8,7 @@ world = MPI.COMM_WORLD
 ptr = MPI._addressof(world)
 raw = ffi.cast('uintptr_t*', ptr)
 
-points = np.random.rand(10, 3)
+points = np.random.rand(1000, 3)
 tree = DistributedTree.from_global_points(points, False, raw)
 
 

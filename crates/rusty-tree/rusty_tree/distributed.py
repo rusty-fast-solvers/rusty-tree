@@ -1,4 +1,8 @@
+"""
+Distributed Tree.
+"""
 import numpy as np
+
 from rusty_tree import lib, ffi
 from rusty_tree.types.morton import MortonKey
 from rusty_tree.types.point import Point
@@ -7,7 +11,10 @@ from rusty_tree.types.iterator import Iterator
 
 class DistributedTree:
     """
-    Wrap a Distributed Tree data structure from Rust.
+    Wrap a DistributedTree structure from Rust. Don't directly use constructor,
+    instead use the provided class method to create a DistributedTree from a
+    set of points, distributed globally across the set of processors provided
+    to the constructor via its communicator.
     """
     def __init__(self, p_tree):
         self.ctype = p_tree
