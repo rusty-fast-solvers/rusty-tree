@@ -1,6 +1,6 @@
 import numpy as np
 
-from rusty_tree import ffi, lib
+from rusty_tree import lib, ffi
 
 
 class Point:

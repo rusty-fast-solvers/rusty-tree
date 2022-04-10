@@ -1,12 +1,12 @@
-"""Data Structure for Morton Key."""
 import numpy as np
+
 from rusty_tree import lib, ffi
 
 
 class Domain:
     def __init__(self, p_domain):
         """
-        Initialize a domain from an origin and a diameter.
+        Initialize a domain from a pointer to a Domain struct in Rust.
 
         This constructor should not be used outside the class. Instead
         use the provided class methods to construct a Domain object.

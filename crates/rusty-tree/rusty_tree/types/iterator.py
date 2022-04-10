@@ -12,6 +12,20 @@ class IteratorProtocol:
     """
 
     def __init__(self, p_type, c_name, clone, next, index):
+        """
+        Params:
+        -------
+        p_type : Object
+            Python object that mirrors a struct from Rust.
+        c_name : str
+            The name of the Rust struct.
+        clone : _cffi_backend._CDataBase
+            CFFI function for cloning a slice of a Rust iterator.
+        next : _cffi_backend._CDataBase
+            CFFI function for advancing a single element in a Rust iterator.
+        index : _cffi_backend._CDataBase
+            CFFI function for indexing a single element from a Rust iterator.
+        """
         self.p_type = p_type
         self.c_name = c_name
         self.clone = clone
@@ -20,15 +34,19 @@ class IteratorProtocol:
 
 
 MortonProtocol = IteratorProtocol(
-    MortonKey,
-    "MortonKey",
-    lib.morton_key_clone,
-    lib.morton_key_next,
-    lib.morton_key_index,
+    p_type=MortonKey,
+    c_name="MortonKey",
+    clone=lib.morton_key_clone,
+    next=lib.morton_key_next,
+    index=lib.morton_key_index,
 )
 
 PointProtocol = IteratorProtocol(
-    Point, "Point", lib.point_clone, lib.point_next, lib.point_index
+    p_type=Point,
+    c_name="Point",
+    clone=lib.point_clone,
+    next=lib.point_next,
+    index=lib.point_index,
 )
 
 
@@ -41,6 +59,16 @@ class Iterator:
         """
         This constructor should not be used outside the class. Instead
         use the provided class methods to construct an Iterator object.
+
+        Params:
+        -------
+        pointer : cdata 'struct <Vec<T>> *'
+            Pointer to a the first element in a Vec<T> in Rust where type 'T'
+            has been exposed in Python.
+        n : int
+            Number of elements in Vec<T>.
+        iterator_protocol : IteratorProtocol
+            Helper class exposing the Rust iterator in Python.
         """
         self._pointer = pointer
         self._n = n
@@ -52,12 +80,32 @@ class Iterator:
 
     @classmethod
     def from_points(cls, pointer, n):
-        """Construct an Iterator for an exposed list of Points"""
+        """
+        Construct an Iterator for an exposed Vec<Point>.
+
+        Params:
+        -------
+        pointer : cdata 'struct <T> *'
+            Pointer to a the first element in a Vec<T> in Rust where type 'T'
+            has been exposed in Python.
+        n : int
+            Number of elements in Vec<T>.
+        """
         return cls(pointer, n, PointProtocol)
 
     @classmethod
     def from_keys(cls, pointer, n):
-        """Construct an Iterator for an exposed list of Keys"""
+        """
+        Construct an Iterator for an exposed Vec<MortonKey>.
+
+        Params:
+        -------
+        pointer : cdata 'struct <T> *'
+            Pointer to a the first element in a Vec<T> in Rust where type 'T'
+            has been exposed in Python.
+        n : int
+            Number of elements in Vec<T>.
+        """
         return cls(pointer, n, MortonProtocol)
 
     def __len__(self):
@@ -85,19 +133,22 @@ class Iterator:
 
     @property
     def head(self):
+        """Return head of iterator, wrapped in Python type."""
         return self._iterator_protocol.p_type(self._head)
 
     @property
     def ctype(self):
+        """Return the current head"""
         return self._head
 
     def _index(self, index):
+        """Index into an element of the exposed Vec<T> without copy."""
         index = ffi.cast("size_t", index)
         ntot = ffi.cast("size_t", len(self))
         return self._iterator_protocol.index(self._head, ntot, index)
 
     def _clone(self, start, stop):
-        """Clone a slice into a Python datatype"""
+        """Clone a slice of the exposed Vec<T> into a Python datatype."""
         n = ffi.cast("size_t", len(self))
         nslice = stop - start
         start = ffi.cast("size_t", start)
@@ -113,6 +164,7 @@ class Iterator:
         ]
 
     def _slice(self, start, stop):
+        """Index into a slice of the exposed Vec<T> without copy."""
         nslice = stop - start
         ptr = self._index(start)[0]
         return Iterator(ptr, nslice, self._iterator_protocol)
