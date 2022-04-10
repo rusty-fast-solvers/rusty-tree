@@ -43,10 +43,10 @@ unbalanced = DistributedTree.from_global_points(points, False, comm)
 # (without copy of underlying Rust data)
 
 # Slice of 10 keys
-key_slice = iterator.keys[:10]
+key_slice = balanced.keys[:10]
 
 # Slice of 10 points
-point_slice = iterator.points[:10]
+point_slice = balanced.points[:10]
 
 for key in key_slice:
     foo(key)
