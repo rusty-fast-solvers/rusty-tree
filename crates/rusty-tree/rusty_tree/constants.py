@@ -7,6 +7,7 @@ from rusty_tree.types.morton import MortonKey
 
 
 def load_cbuffer(c_buffer, shape, dtype):
+    """Load C Buffer into a Numpy Buffer"""
     size = 8
     for dim in shape:
         size = dim * size

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use mpi::{environment::Universe, topology::{Color, SystemCommunicator}, traits::*};
+use mpi::{environment::Universe, topology::{SystemCommunicator}, traits::*};
 
 use rand::prelude::*;
 use rand::SeedableRng;
@@ -165,36 +165,36 @@ fn main() {
 
     // Distributed Trees
     let unbalanced = unbalanced_tree_fixture(&world);
-    // let balanced = balanced_tree_fixture(&world);
+    let balanced = balanced_tree_fixture(&world);
 
     // Tests for the unbalanced tree
-    // test_ncrit(&unbalanced.points_to_keys);
-    // println!("test_ncrit ... passed for unbalanced trees");
+    test_ncrit(&unbalanced.points_to_keys);
+    println!("test_ncrit ... passed for unbalanced trees");
 
-    // test_span(&unbalanced.points_to_keys);
-    // println!("test_span ... passed for unbalanced trees");
+    test_span(&unbalanced.points_to_keys);
+    println!("test_span ... passed for unbalanced trees");
 
-    // test_no_overlaps(&world, &unbalanced.points_to_keys);
-    // if rank == 0 {
-    //     println!("test_no_overlaps ... passed for unbalanced trees");
-    // }
+    test_no_overlaps(&world, &unbalanced.points_to_keys);
+    if rank == 0 {
+        println!("test_no_overlaps ... passed for unbalanced trees");
+    }
 
-    // // Tests for the balanced tree
-    // test_ncrit(&balanced.points_to_keys);
-    // println!("test_ncrit ... passed for unbalanced trees");
+    // Tests for the balanced tree
+    test_ncrit(&balanced.points_to_keys);
+    println!("test_ncrit ... passed for unbalanced trees");
 
-    // test_span(&balanced.points_to_keys);
-    // println!("test_span ... passed for unbalanced trees");
+    test_span(&balanced.points_to_keys);
+    println!("test_span ... passed for unbalanced trees");
 
-    // test_no_overlaps(&world, &balanced.points_to_keys);
-    // if rank == 0 {
-    //     println!("test_no_overlaps ... passed for balanced trees");
-    // }
+    test_no_overlaps(&world, &balanced.points_to_keys);
+    if rank == 0 {
+        println!("test_no_overlaps ... passed for balanced trees");
+    }
 
-    // // Other parallel functionality
-    // test_global_bounds(&world);
-    // if rank == 0 {
-    //     println!("test_global_bounds ... passed");
-    // }
+    // Other parallel functionality
+    test_global_bounds(&world);
+    if rank == 0 {
+        println!("test_global_bounds ... passed");
+    }
 
 }
