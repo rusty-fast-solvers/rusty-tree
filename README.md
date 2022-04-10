@@ -48,7 +48,6 @@ key_slice = iterator.keys[:10]
 # Slice of 10 points
 point_slice = iterator.points[:10]
 
-
 for key in key_slice:
     foo(key)
 
