@@ -3,11 +3,12 @@ import numpy as np
 from rusty_tree import ffi, lib
 from rusty_tree.types.morton import MortonKey
 
+
 def load_cbuffer(c_buffer, shape, dtype):
     size = 8
     for dim in shape:
-        size = dim*size
-    
+        size = dim * size
+
     return np.frombuffer(ffi.buffer(c_buffer, size), dtype).reshape(shape)
 
 

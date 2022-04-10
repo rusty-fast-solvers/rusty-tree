@@ -4,7 +4,6 @@ from rusty_tree import lib, ffi
 
 
 class Domain:
-    
     def __init__(self, p_domain):
         """
         Initialize a domain from an origin and a diameter.
@@ -18,7 +17,7 @@ class Domain:
     def ctype(self):
         """Give access to the underlying ctype."""
         return self._p_domain
-    
+
     @property
     def origin(self):
         return np.array([*self.ctype.origin], dtype=np.float64)
@@ -29,17 +28,16 @@ class Domain:
 
     @classmethod
     def from_local_points(cls, points):
-        points = np.array(points, dtype=np.float64, order='C')
+        points = np.array(points, dtype=np.float64, order="C")
         npoints, _ = points.shape
         points_data = ffi.from_buffer(f"double(*)[3]", points)
-        n_points_data= ffi.cast('size_t', npoints)
+        n_points_data = ffi.cast("size_t", npoints)
         return cls(lib.domain_from_local_points(points_data, npoints))
 
     @classmethod
     def from_global_points(cls, points, comm):
-        points = np.array(points, dtype=np.float64, order='C')
+        points = np.array(points, dtype=np.float64, order="C")
         npoints, _ = points.shape
         points_data = ffi.from_buffer(f"double(*)[3]", points)
-        n_points_data= ffi.cast('size_t', npoints)
+        n_points_data = ffi.cast("size_t", npoints)
         return cls(lib.domain_from_global_points(points_data, npoints, comm))
-    

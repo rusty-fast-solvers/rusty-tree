@@ -2,8 +2,8 @@ import numpy as np
 
 from rusty_tree import ffi, lib
 
-class Point:
 
+class Point:
     def __init__(self, p_point):
         self._p_point = p_point
 
@@ -34,10 +34,10 @@ class Point:
     def __repr__(self):
         return str(
             {
-                "coordinate": self.coordinate(), 
+                "coordinate": self.coordinate(),
                 "global_idx": self.global_idx(),
                 "key": self.morton(),
-                "anchor": self.anchor()
+                "anchor": self.anchor(),
             }
         )
 
@@ -49,7 +49,7 @@ class Point:
     def coordinate(self):
         """Return the coordinate."""
         return np.array([*self.ctype.coordinate], dtype=np.float64)
-    
+
     def global_idx(self):
         """Return the coordinate."""
         return self.ctype.global_idx

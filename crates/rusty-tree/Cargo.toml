@@ -14,7 +14,6 @@ categories = ["mathematics", "science"]
 name = "rusty_tree"
 crate-type = ["lib", "cdylib"]
 
-
 [dependencies]
 itertools = "0.10"
 mpi = { git = "https://github.com/rsmpi/rsmpi", branch = "main"}

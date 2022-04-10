@@ -7,8 +7,10 @@ from rusty_tree.types.point import Point
 
 class IteratorProtocol:
     """
-    Wrapper for a Rust Iterator protocol.
+    Wrapper defining an Iterator protocol implemented via Rust
+    functions exposed via the CFFI.
     """
+
     def __init__(self, p_type, c_name, clone, next, index):
         self.p_type = p_type
         self.c_name = c_name
@@ -16,41 +18,46 @@ class IteratorProtocol:
         self.next = next
         self.index = index
 
+
 MortonProtocol = IteratorProtocol(
     MortonKey,
-    'MortonKey',
+    "MortonKey",
     lib.morton_key_clone,
     lib.morton_key_next,
-    lib.morton_key_index
+    lib.morton_key_index,
 )
 
 PointProtocol = IteratorProtocol(
-    Point,
-    'Point',
-    lib.point_clone,
-    lib.point_next,
-    lib.point_index
+    Point, "Point", lib.point_clone, lib.point_next, lib.point_index
 )
+
 
 class Iterator:
     """
     Wrapper for Rust iterators exposed via a raw pointer via CFFI.
     """
+
     def __init__(self, pointer, n, iterator_protocol):
+        """
+        This constructor should not be used outside the class. Instead
+        use the provided class methods to construct an Iterator object.
+        """
         self._pointer = pointer
         self._n = n
         self._head = pointer
         self._curr = self._head
         self._iter = 0
         self._n = n
-        self.iterator_protocol = iterator_protocol
+        self._iterator_protocol = iterator_protocol
 
     @classmethod
     def from_points(cls, pointer, n):
+        """Construct an Iterator for an exposed list of Points"""
         return cls(pointer, n, PointProtocol)
 
     @classmethod
     def from_keys(cls, pointer, n):
+        """Construct an Iterator for an exposed list of Keys"""
         return cls(pointer, n, MortonProtocol)
 
     def __len__(self):
@@ -63,7 +70,7 @@ class Iterator:
 
     def __next__(self):
         _curr = self._curr
-        _next = self.iterator_protocol.next(self._curr)[0]
+        _next = self._iterator_protocol.next(self._curr)[0]
 
         if self._iter < len(self):
             if _curr != _next:
@@ -78,35 +85,37 @@ class Iterator:
 
     @property
     def head(self):
-        return self.iterator_protocol.p_type(self._head)
+        return self._iterator_protocol.p_type(self._head)
 
     @property
     def ctype(self):
         return self._head
 
     def _index(self, index):
-        index = ffi.cast('size_t', index)
-        ntot = ffi.cast('size_t', len(self))
-        return self.iterator_protocol.index(self._head, ntot, index)
+        index = ffi.cast("size_t", index)
+        ntot = ffi.cast("size_t", len(self))
+        return self._iterator_protocol.index(self._head, ntot, index)
 
     def _clone(self, start, stop):
         """Clone a slice into a Python datatype"""
-        n = ffi.cast('size_t', len(self))
-        nslice = stop-start
-        start = ffi.cast('size_t', start)
-        stop = ffi.cast('size_t', stop)
+        n = ffi.cast("size_t", len(self))
+        nslice = stop - start
+        start = ffi.cast("size_t", start)
+        stop = ffi.cast("size_t", stop)
         ptr = np.empty(nslice, dtype=np.uint64)
-        ptr_data = ffi.from_buffer('uintptr_t *', ptr)
-        self.iterator_protocol.clone(self._head, ptr_data, n, start, stop)
+        ptr_data = ffi.from_buffer("uintptr_t *", ptr)
+        self._iterator_protocol.clone(self._head, ptr_data, n, start, stop)
         return [
-            self.iterator_protocol.p_type(ffi.cast(f'{self.iterator_protocol.c_name} *', ptr[index]))
+            self._iterator_protocol.p_type(
+                ffi.cast(f"{self._iterator_protocol.c_name} *", ptr[index])
+            )
             for index in range(nslice)
-            ]
+        ]
 
     def _slice(self, start, stop):
-        nslice = stop-start
+        nslice = stop - start
         ptr = self._index(start)[0]
-        return Iterator(ptr, nslice, self.iterator_protocol)
+        return Iterator(ptr, nslice, self._iterator_protocol)
 
     def __getitem__(self, key):
         if isinstance(key, slice):
@@ -114,8 +123,8 @@ class Iterator:
             return self._slice(start, stop)
 
         elif isinstance(key, int):
-            ptr = self._slice(key, key+1)
+            ptr = self._slice(key, key + 1)
             return ptr
 
         else:
-            raise TypeError('Invalid argument type: {}'.format(type(key)))
+            raise TypeError("Invalid argument type: {}".format(type(key)))
