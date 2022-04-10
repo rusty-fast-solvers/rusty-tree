@@ -24,17 +24,20 @@ Write a script:
 from mpi4py import MPI
 import numpy as np
 
-from rusty_tree import ffi
 from rusty_tree.distributed import DistributedTree
 
-comm = MPI.COMM_WORLD
-ptr = MPI._addressof(comm)
-raw = ffi.cast('uintptr_t*', ptr)
 
+# Setup communicator
+comm = MPI.COMM_WORLD
+
+# Cartesian points at this process
 points = np.random.rand(100000, 3)
 
-balanced = DistributedTree.from_global_points(points, True, raw)
-print(comm.size, comm.rank)
+# Generate a balanced tree
+balanced = DistributedTree.from_global_points(points, True, comm)
+
+# Generate an unbalanced tree
+unbalanced = DistributedTree.from_global_points(points, False, comm)
 ```
 
 Run a script using mpi4py (specified in requirements)
