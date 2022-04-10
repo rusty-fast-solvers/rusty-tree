@@ -6,7 +6,7 @@ from rusty_tree import lib, ffi
 class MortonKey:
     def __init__(self, p_key):
         """
-        Initialize a Morton key from a pointer to a MortonKey struct in Rust.
+        Initialize a MortonKey from a pointer to a MortonKey struct in Rust.
 
         This constructor should not be used outside the class. Instead
         use the provided class methods to construct a MortonKey object.
