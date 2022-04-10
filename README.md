@@ -38,6 +38,23 @@ balanced = DistributedTree.from_global_points(points, True, comm)
 
 # Generate an unbalanced tree
 unbalanced = DistributedTree.from_global_points(points, False, comm)
+
+# Trees implement iterator protocol as well as slicing and indexing 
+# (without copy of underlying Rust data)
+
+# Slice of 10 keys
+key_slice = iterator.keys[:10]
+
+# Slice of 10 points
+point_slice = iterator.points[:10]
+
+
+for key in key_slice:
+    foo(key)
+
+# Copy only performed when printing in Python
+print(point_slice)
+print(key_slice)
 ```
 
 Run a script using mpi4py (specified in requirements)
