@@ -1,13 +1,6 @@
 """
-rusty-tree: Large-scale parallel octrees
+Large scale distributed octrees.
 """
-
-# Deepest Level
-DEEPEST_LEVEL = 16
-
-# The level displacement in a Morton index in bits
-LEVEL_DISPLACEMENT = 15
-
-from .rusty_tree import ffi, lib
-
-
+# API
+from .rusty_tree import lib, ffi
+from rusty_tree.distributed import DistributedTree

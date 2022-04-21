@@ -2,6 +2,68 @@
 
 Implementation of Octrees [1] in Rust with Python interfaces.
 
+# Python Library
+
+Install and use from Anaconda, relies on a working MPI implementation on your system.
+
+```bash
+conda install -c skailasa rusty_tree
+```
+
+## Build
+
+```bash
+cd crates/rusty-tree/ && maturin develop --release
+```
+
+## Usage
+
+Write a script:
+
+```python
+from mpi4py import MPI
+import numpy as np
+
+from rusty_tree.distributed import DistributedTree
+
+
+# Setup communicator
+comm = MPI.COMM_WORLD
+
+# Cartesian points at this process
+points = np.random.rand(100000, 3)
+
+# Generate a balanced tree
+balanced = DistributedTree.from_global_points(points, True, comm)
+
+# Generate an unbalanced tree
+unbalanced = DistributedTree.from_global_points(points, False, comm)
+
+# Trees implement iterator protocol as well as slicing and indexing 
+# (without copy of underlying Rust data)
+
+# Slice of 10 keys
+key_slice = balanced.keys[:10]
+
+# Slice of 10 points
+point_slice = balanced.points[:10]
+
+for key in key_slice:
+    foo(key)
+
+# Copy only performed when printing in Python
+print(point_slice)
+print(key_slice)
+```
+
+Run a script using mpi4py (specified in requirements)
+
+```bash
+mpiexec -n <nprocs> python -m mpi4py /path/to/script/
+```
+
+# Rust Library
+
 ## Build
 
 ```bash
@@ -16,7 +78,7 @@ use rand::prelude::*;
 use rand::SeedableRng;
 
 use mpi::{
-    environment::Universe, 
+    environment::Universe,
     topology::{Color, UserCommunicator},
     traits::*
 };
@@ -27,7 +89,7 @@ use rusty_tree::{
     types::{
         domain::Domain,
         morton::MortonKey
-        point::PointType, 
+        point::PointType,
     },
 };
 
@@ -51,17 +113,12 @@ fn main () {
     let universe: Universe = mpi::initialize().unwrap();
     let comm: UserCommunicator = universe.world();
     let comm = comm.split_by_color(Color::with_value(0)).unwrap();
-    
-    // Calculate the global domain defined by the distributed points
-    let domain: Domain = compute_global_domain(&points, &comm);
-
-    // Generate a distributed tree
 
     // Unbalanced
-    let unbalanced: DistributedTree = DistributedTree::new(&points, &domain, false, &universe)
+    let unbalanced: DistributedTree = DistributedTree::new(&points, false, &comm)
 
     // Balanced
-    let balanced_tree: DistributedTree = DistributedTree::new(&points, &domain, true, &universe)
+    let balanced_tree: DistributedTree = DistributedTree::new(&points, true, &comm)
 }
 ```
 

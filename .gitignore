@@ -13,13 +13,19 @@ Cargo.lock
 **/__pycache__/*
 *.py[oc]
 *.ipynb
+**/build/*
+**/dist/*
+**/*.egg-info/*
 
 # Lib
 *.so
+*.dylib
+*.dll
 
 # Rust
 build_and_test.sh
 rusty_tree/rusty_tree/*
 ./crates/*/target/*
 
+# Editor
 .vscode/*
