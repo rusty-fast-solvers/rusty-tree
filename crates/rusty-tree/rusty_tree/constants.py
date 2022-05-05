@@ -1,3 +1,6 @@
+"""
+Project wide constants.
+"""
 import os
 
 import numpy as np

@@ -1,3 +1,7 @@
+"""
+Python Iterators that help to manipulate Rust Iterators without copying data
+into Numpy arrays.
+"""
 import numpy as np
 
 from rusty_tree import lib, ffi
@@ -7,8 +11,8 @@ from rusty_tree.types.point import Point
 
 class IteratorProtocol:
     """
-    Wrapper defining an Iterator protocol implemented via Rust
-    functions exposed via the CFFI.
+    Wrapper defining an Iterator protocol implemented via Rust functions
+    exposed via the CFFI.
     """
 
     def __init__(self, p_type, c_name, clone, next, index):
@@ -54,14 +58,13 @@ class Iterator:
     """
     Wrapper for Rust iterators exposed via a raw pointer via CFFI.
     """
-
     def __init__(self, pointer, n, iterator_protocol):
         """
         This constructor should not be used outside the class. Instead
         use the provided class methods to construct an Iterator object.
 
-        Params:
-        -------
+        Parameters
+        ----------
         pointer : cdata 'struct <Vec<T>> *'
             Pointer to a the first element in a Vec<T> in Rust where type 'T'
             has been exposed in Python.
@@ -83,13 +86,18 @@ class Iterator:
         """
         Construct an Iterator for an exposed Vec<Point>.
 
-        Params:
-        -------
+        Parameters
+        ----------
         pointer : cdata 'struct <T> *'
             Pointer to a the first element in a Vec<T> in Rust where type 'T'
             has been exposed in Python.
         n : int
             Number of elements in Vec<T>.
+
+        Returns
+        -------
+        Iterator
+            Instance of Rust iterator now wrapped in Python.
         """
         return cls(pointer, n, PointProtocol)
 
@@ -98,13 +106,18 @@ class Iterator:
         """
         Construct an Iterator for an exposed Vec<MortonKey>.
 
-        Params:
-        -------
+        Parameters
+        ----------
         pointer : cdata 'struct <T> *'
             Pointer to a the first element in a Vec<T> in Rust where type 'T'
             has been exposed in Python.
         n : int
             Number of elements in Vec<T>.
+
+        Returns
+        -------
+        Iterator
+            Instance of Rust iterator now wrapped in Python.
         """
         return cls(pointer, n, MortonProtocol)
 
@@ -129,11 +142,12 @@ class Iterator:
             raise StopIteration
 
     def __repr__(self):
+        """Printing to stdout forces a copy."""
         return str(self._clone(0, len(self)))
 
     @property
     def head(self):
-        """Return head of iterator, wrapped in Python type."""
+        """Return head of iterator, wrapped in a new compatible Python type."""
         return self._iterator_protocol.p_type(self._head)
 
     @property
@@ -142,7 +156,9 @@ class Iterator:
         return self._head
 
     def _index(self, index):
-        """Index into an element of the exposed Vec<T> without copy."""
+        """
+        Index into an element of the exposed Vec<T> without copy.
+        """
         index = ffi.cast("size_t", index)
         ntot = ffi.cast("size_t", len(self))
         return self._iterator_protocol.index(self._head, ntot, index)
@@ -164,7 +180,10 @@ class Iterator:
         ]
 
     def _slice(self, start, stop):
-        """Index into a slice of the exposed Vec<T> without copy."""
+        """
+        Index into a slice of the exposed Vec<T> without copy by returning the
+        slice inside a new Python Iterator.
+        """
         nslice = stop - start
         ptr = self._index(start)[0]
         return Iterator(ptr, nslice, self._iterator_protocol)
