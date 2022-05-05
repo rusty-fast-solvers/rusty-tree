@@ -1,7 +1,7 @@
 //! Crate wide constants.
 
+use crate::types::morton::{KeyType, MortonKey};
 use mpi::topology::Rank;
-use  crate::types::morton::{KeyType, MortonKey};
 
 pub const K: Rank = 2;
 
@@ -11,7 +11,10 @@ pub const DEEPEST_LEVEL: KeyType = 16;
 
 pub const LEVEL_SIZE: KeyType = 65536;
 
-pub const ROOT: MortonKey = MortonKey{anchor: [0, 0, 0], morton: 0};
+pub const ROOT: MortonKey = MortonKey {
+    anchor: [0, 0, 0],
+    morton: 0,
+};
 
 pub const DIRECTIONS: [[i64; 3]; 26] = [
     [-1, -1, -1],
@@ -216,4 +219,3 @@ pub const BYTE_DISPLACEMENT: KeyType = 8;
 
 // Mask encapsulating a bit.
 pub const NINE_BIT_MASK: KeyType = 0x1FF;
-

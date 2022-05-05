@@ -1,5 +1,1 @@
 //! Assorted helper functions.
-
-
-
-

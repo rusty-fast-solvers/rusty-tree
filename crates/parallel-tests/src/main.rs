@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use mpi::{environment::Universe, topology::{SystemCommunicator}, traits::*};
+use mpi::{environment::Universe, topology::SystemCommunicator, traits::*};
 
 use rand::prelude::*;
 use rand::SeedableRng;
@@ -53,7 +53,7 @@ fn test_ncrit(tree: &HashMap<MortonKey, MortonKey>) {
         if !blocks_to_points.contains_key(block) {
             blocks_to_points.insert(*block, 1);
         } else if let Some(b) = blocks_to_points.get_mut(block) {
-                *b += 1;
+            *b += 1;
         }
     }
 
@@ -107,7 +107,6 @@ fn test_span(tree: &HashMap<MortonKey, MortonKey>) {
 
 /// Test that the leaves on separate nodes do not overlap.
 fn test_no_overlaps(world: &SystemCommunicator, tree: &HashMap<MortonKey, MortonKey>) {
-
     // Communicate bounds from each process
     let max = tree.iter().map(|(_, block)| block).max().unwrap();
     let min = *tree.iter().map(|(_, block)| block).min().unwrap();
@@ -134,15 +133,13 @@ fn test_no_overlaps(world: &SystemCommunicator, tree: &HashMap<MortonKey, Morton
     }
 
     // Test that the partner's minimum node is greater than the process's maximum node
-    if rank < size -1 {
+    if rank < size - 1 {
         assert!(max < &partner_min)
     }
 }
 
-
 /// Test that the globally defined domain contains all the points at a given node.
 fn test_global_bounds(world: &SystemCommunicator) {
-
     let points = points_fixture();
 
     let comm = world.duplicate();
@@ -151,9 +148,9 @@ fn test_global_bounds(world: &SystemCommunicator) {
 
     // Test that all local points are contained within the global domain
     for point in points {
-        assert!(domain.origin[0] <= point[0] && point[0] <= domain.origin[0]+domain.diameter[0]);
-        assert!(domain.origin[1] <= point[1] && point[1] <= domain.origin[1]+domain.diameter[1]);
-        assert!(domain.origin[2] <= point[2] && point[2] <= domain.origin[2]+domain.diameter[2]);
+        assert!(domain.origin[0] <= point[0] && point[0] <= domain.origin[0] + domain.diameter[0]);
+        assert!(domain.origin[1] <= point[1] && point[1] <= domain.origin[1] + domain.diameter[1]);
+        assert!(domain.origin[2] <= point[2] && point[2] <= domain.origin[2] + domain.diameter[2]);
     }
 }
 
@@ -196,5 +193,4 @@ fn main() {
     if rank == 0 {
         println!("test_global_bounds ... passed");
     }
-
 }

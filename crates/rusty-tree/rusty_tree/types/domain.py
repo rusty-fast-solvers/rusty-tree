@@ -28,17 +28,41 @@ class Domain:
 
     @property
     def origin(self):
-        """Coordinate corresponding to the origin of the domain."""
+        """
+        Coordinate corresponding to the origin of the domain.
+        
+        Returns
+        -------
+        np.array(shape=(3, 1), dtype=np.float64)
+        """
         return np.array([*self.ctype.origin], dtype=np.float64)
 
     @property
     def diameter(self):
-        """Width of domain along each axis."""
+        """
+        Width of domain along each axis.
+        
+        Returns
+        --------
+        np.array(shape=(3, 1), dtype=np.float64)
+        """
         return np.array([*self.ctype.diameter], dtype=np.float64)
 
     @classmethod
     def from_local_points(cls, points):
-        """Infer the domain from points on this processor."""
+        """
+        Infer the domain from points on this processor.
+        
+        Parameters
+        ----------
+        points: np.array(shape=(n, 3), dtype=np.float64)
+            Points on this processor
+
+        Returns
+        -------
+        Domain
+            Domain of points on this processor.
+        """
         points = np.array(points, dtype=np.float64, order="C")
         npoints, _ = points.shape
         points_data = ffi.from_buffer(f"double(*)[3]", points)
@@ -46,7 +70,21 @@ class Domain:
 
     @classmethod
     def from_global_points(cls, points, comm):
-        """Infer the domain from points on all processors."""
+        """
+        Infer the domain from points on all processors.
+
+        Parameters
+        ----------
+        points: np.array(shape=(n, 3), dtype=np.float64)
+            Points on this processor.
+        comm: cdata 'MPI_Comm'
+            C communicator.
+
+        Returns
+        -------
+        Domain
+            Domain of points on all processors in communicator 'comm'.
+        """
         points = np.array(points, dtype=np.float64, order="C")
         npoints, _ = points.shape
         points_data = ffi.from_buffer(f"double(*)[3]", points)

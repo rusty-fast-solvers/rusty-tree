@@ -1,7 +1,7 @@
 // C API for project constants
 
-use crate::types::morton::KeyType;
 use crate::constants;
+use crate::types::morton::KeyType;
 
 #[no_mangle]
 pub static LEVEL_DISPLACEMENT: usize = constants::LEVEL_DISPLACEMENT;

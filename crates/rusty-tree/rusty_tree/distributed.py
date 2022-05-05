@@ -42,13 +42,13 @@ class DistributedTree:
 
         Parameters
         ----------
-        p_tree: Object
-            Pointer to the tree generated in Rust.
+        p_tree: cdata 'struct <DistributedTree> *'
+            Pointer to a DistributedTree struct initialized in Rust.
         comm: mpi4py.MPI.Intracomm
             MPI world communicator, created using mpi4py.
-        p_comm: C *MPI_Comm
+        p_comm: cdata '*MPI_Comm'
             Pointer to underlying C communicator.
-        raw_comm: C MPI_Comm
+        raw_comm: cdata 'MPI_Comm'
             Underlying C communicator.
         """
         self.ctype = p_tree
@@ -78,6 +78,10 @@ class DistributedTree:
             If 'True' constructs a balanced tree, if 'False' constructs an unbalanced tree.
         comm: mpi4py.MPI.Intracomm
             MPI world communicator, created using mpi4py.
+
+        Returns
+        -------
+        DistributedTree
         """
         points = np.array(points, dtype=np.float64, order="C", copy=False)
         npoints, _ = points.shape

@@ -1,14 +1,7 @@
 [project]
 name = "rusty_tree"
 requires-python = ">=3.8"
-classifiers = [
-    "Topic :: Software Development :: Build Tools",
-    "Programming Language :: Rust",
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
-]
-dependencies = ["cffi"]
-
+dependencies = ["cffi", "numpy", "mpi4py"]
 
 [build-system]
 requires = ["maturin>=0.12,<0.13", "cffi"]

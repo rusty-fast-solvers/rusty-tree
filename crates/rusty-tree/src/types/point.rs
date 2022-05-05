@@ -5,13 +5,11 @@ use std::hash::{Hash, Hasher};
 
 use memoffset::offset_of;
 use mpi::{
+    datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
     Address,
-    datatype::{
-        Equivalence, UncommittedUserDatatype, UserDatatype
-    }
 };
 
-use crate::types::morton::{MortonKey, KeyType};
+use crate::types::morton::{KeyType, MortonKey};
 
 pub type PointType = f64;
 
@@ -43,14 +41,17 @@ unsafe impl Equivalence for Point {
                     &[1, 1],
                     &[
                         offset_of!(MortonKey, anchor) as Address,
-                        offset_of!(MortonKey, morton) as Address
+                        offset_of!(MortonKey, morton) as Address,
                     ],
                     &[
-                        UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype()).as_ref(),
-                        UncommittedUserDatatype::contiguous(1, &KeyType::equivalent_datatype()).as_ref(),
-                    ]
-                ).as_ref()
-            ]
+                        UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype())
+                            .as_ref(),
+                        UncommittedUserDatatype::contiguous(1, &KeyType::equivalent_datatype())
+                            .as_ref(),
+                    ],
+                )
+                .as_ref(),
+            ],
         )
     }
 }

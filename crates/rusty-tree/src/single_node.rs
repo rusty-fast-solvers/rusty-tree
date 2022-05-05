@@ -1,33 +1,24 @@
 //! Data structures and methods to create Octrees on a single node.
 
 use std::{
+    collections::HashSet,
     ops::{Deref, DerefMut},
-    collections::{HashSet}
 };
 
 use itertools::Itertools;
 
-use crate::{
-    constants::DEEPEST_LEVEL,
-    types::{
-        morton::MortonKey
-    }
-};
+use crate::{constants::DEEPEST_LEVEL, types::morton::MortonKey};
 
-
+/// Interface for a local (non-distributed) Tree.
 #[derive(Debug)]
 pub struct Tree {
-    // pub balanced: bool,
-    // pub points: Vec<Point>,
-    // pub points_to_nodes: HashMap<MortonKey, MortonKey>,
+    /// The nodes that span the tree, defined by its leaf nodes, not necessarily complete.
     pub keys: Vec<MortonKey>,
 }
 
 impl Tree {
-
-    /// Input must be sorted!
-     pub fn linearize_keys(keys: Vec<MortonKey>) -> Vec<MortonKey> {
-
+    /// Linearize (remove overlaps) a vector of keys. The input must be sorted.
+    pub fn linearize_keys(keys: Vec<MortonKey>) -> Vec<MortonKey> {
         let nkeys = keys.len();
 
         // Then we remove the ancestors.
@@ -35,21 +26,23 @@ impl Tree {
 
         // Now check pairwise for ancestor relationship and only add to new vector if item
         // is not an ancestor of the next item. Add final element.
-        keys.into_iter().enumerate().tuple_windows::<((_, _), (_, _))>().for_each(|((_, a), (j, b))| {
-            if !a.is_ancestor(&b) {
-                new_keys.push(a);
-            }
-            if j == (nkeys -1) {
-                new_keys.push(b);
-            }
-        });
+        keys.into_iter()
+            .enumerate()
+            .tuple_windows::<((_, _), (_, _))>()
+            .for_each(|((_, a), (j, b))| {
+                if !a.is_ancestor(&b) {
+                    new_keys.push(a);
+                }
+                if j == (nkeys - 1) {
+                    new_keys.push(b);
+                }
+            });
 
         new_keys
     }
 
+    /// Complete the region between two keys with the minimum spanning nodes.
     pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
-        // let mut region = Vec::<Key>::new();
-
         let mut a_ancestors: HashSet<MortonKey> = a.ancestors();
         let mut b_ancestors: HashSet<MortonKey> = b.ancestors();
 
@@ -61,8 +54,7 @@ impl Tree {
 
         while !work_list.is_empty() {
             let current_item = work_list.pop().unwrap();
-            if (current_item > *a) & (current_item < *b) & !b_ancestors.contains(&current_item)
-            {
+            if (current_item > *a) & (current_item < *b) & !b_ancestors.contains(&current_item) {
                 minimal_tree.push(current_item);
             } else if (a_ancestors.contains(&current_item)) | (b_ancestors.contains(&current_item))
             {
@@ -75,6 +67,8 @@ impl Tree {
         minimal_tree
     }
 
+    /// Complete the region between all elements in an tree that doesn't necessarily span
+    /// the domain defined by its least and greatest nodes.
     pub fn complete(self: &mut Tree) {
         let a = self.keys.iter().min().unwrap();
         let b = self.keys.iter().max().unwrap();
@@ -85,18 +79,19 @@ impl Tree {
         self.keys = completion;
     }
 
+    /// Wrapper for linearize_keys over all keys in Tree.
     pub fn linearize(self: &mut Tree) {
         self.keys.sort();
         self.keys = Tree::linearize_keys(self.keys.clone());
     }
 
+    /// Wrapper for sorting a tree, by its keys.
     pub fn sort(self: &mut Tree) {
         self.keys.sort();
     }
 
-    /// Balance a tree, and remove overlaps
+    /// Balance a tree, and remove overlaps.
     pub fn balance(&self) -> Tree {
-
         let mut balanced: HashSet<MortonKey> = self.keys.iter().cloned().collect();
 
         for level in (0..DEEPEST_LEVEL).rev() {
@@ -127,7 +122,7 @@ impl Tree {
         let mut balanced: Vec<MortonKey> = balanced.into_iter().collect();
         balanced.sort();
         let linearized = Tree::linearize_keys(balanced);
-        Tree{keys: linearized}
+        Tree { keys: linearized }
     }
 }
 
@@ -150,20 +145,16 @@ mod tests {
     use super::*;
 
     use rand::prelude::*;
-    use rand::{SeedableRng};
+    use rand::SeedableRng;
 
-    use crate::types::{
-        morton::MortonKey,
-        domain::Domain,
-        point::Point,
-    };
+    use crate::types::{domain::Domain, morton::MortonKey, point::Point};
 
-    fn tree_fixture () -> Tree {
+    fn tree_fixture() -> Tree {
         let npoints: u64 = 1000;
 
-        let domain = Domain{
+        let domain = Domain {
             origin: [0., 0., 0.],
-            diameter: [1., 1., 1.]
+            diameter: [1., 1., 1.],
         };
 
         let mut range = StdRng::seed_from_u64(0);
@@ -171,20 +162,25 @@ mod tests {
         let mut points = Vec::new();
 
         for _ in 0..npoints {
-            points.push([between.sample(&mut range), between.sample(&mut range), between.sample(&mut range)])
+            points.push([
+                between.sample(&mut range),
+                between.sample(&mut range),
+                between.sample(&mut range),
+            ])
         }
 
         let points: Vec<Point> = points
-        .iter()
-        .map(|p| Point{coordinate: p.clone(), global_idx: 0, key: MortonKey::from_point(&p, &domain)})
-        .collect();
+            .iter()
+            .map(|p| Point {
+                coordinate: p.clone(),
+                global_idx: 0,
+                key: MortonKey::from_point(&p, &domain),
+            })
+            .collect();
 
-        let keys: Vec<MortonKey> = points
-        .iter()
-        .map(|p| p.key)
-        .collect();
+        let keys: Vec<MortonKey> = points.iter().map(|p| p.key).collect();
 
-        Tree {keys}
+        Tree { keys }
     }
 
     #[test]
@@ -193,9 +189,9 @@ mod tests {
         tree.linearize();
 
         // Test that a linearized tree is sorted
-        for i in 0..(tree.iter().len()-1) {
+        for i in 0..(tree.iter().len() - 1) {
             let a = tree[i];
-            let b = tree[i+1];
+            let b = tree[i + 1];
             assert!(a <= b);
         }
 
@@ -217,9 +213,14 @@ mod tests {
 
     #[test]
     fn test_complete_region() {
-
-        let a: MortonKey = MortonKey { anchor: [0, 0, 0], morton: 16};
-        let b: MortonKey = MortonKey {anchor: [65535, 65535, 65535], morton: 0b111111111111111111111111111111111111111111111111000000000010000};
+        let a: MortonKey = MortonKey {
+            anchor: [0, 0, 0],
+            morton: 16,
+        };
+        let b: MortonKey = MortonKey {
+            anchor: [65535, 65535, 65535],
+            morton: 0b111111111111111111111111111111111111111111111111000000000010000,
+        };
 
         let region = Tree::complete_region(&a, &b);
 
@@ -252,9 +253,9 @@ mod tests {
         }
 
         // Test that the region is sorted
-        for i in 0..region.iter().len()-1 {
+        for i in 0..region.iter().len() - 1 {
             let a = region[i];
-            let b = region[i+1];
+            let b = region[i + 1];
 
             assert!(a <= b);
         }
