@@ -1,4 +1,4 @@
-// C API for project constants
+//! Wrappers for project constants.
 
 use crate::constants;
 use crate::types::morton::KeyType;

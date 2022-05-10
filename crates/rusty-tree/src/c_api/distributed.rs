@@ -1,3 +1,5 @@
+//! Wrappers for Distributed Tree interface
+
 use mpi::{environment::Universe, ffi::MPI_Comm, topology::UserCommunicator, traits::*};
 
 use crate::{

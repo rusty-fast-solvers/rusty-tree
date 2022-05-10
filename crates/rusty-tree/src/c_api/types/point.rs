@@ -1,3 +1,5 @@
+//! Wrappers for methods on Points.
+
 use crate::types::point::Point;
 
 #[no_mangle]

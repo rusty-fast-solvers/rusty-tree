@@ -1,4 +1,4 @@
-//! Data structures and methods to create Octrees on a single node.
+//! Data Structures and methods to create Octrees on a single node.
 
 use std::{
     collections::HashSet,
@@ -17,7 +17,7 @@ pub struct Tree {
 }
 
 impl Tree {
-    /// Linearize (remove overlaps) a vector of keys. The input must be sorted.
+    /// Linearize (remove overlaps) a vector of keys. The input must be sorted. Algorithm 7 in [1].
     pub fn linearize_keys(keys: Vec<MortonKey>) -> Vec<MortonKey> {
         let nkeys = keys.len();
 
@@ -41,7 +41,7 @@ impl Tree {
         new_keys
     }
 
-    /// Complete the region between two keys with the minimum spanning nodes.
+    /// Complete the region between two keys with the minimum spanning nodes, algorithm 6 in [1].
     pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
         let mut a_ancestors: HashSet<MortonKey> = a.ancestors();
         let mut b_ancestors: HashSet<MortonKey> = b.ancestors();
@@ -90,7 +90,7 @@ impl Tree {
         self.keys.sort();
     }
 
-    /// Balance a tree, and remove overlaps.
+    /// Enforce a 2:1 balance for a tree, and remove any overlaps.
     pub fn balance(&self) -> Tree {
         let mut balanced: HashSet<MortonKey> = self.keys.iter().cloned().collect();
 

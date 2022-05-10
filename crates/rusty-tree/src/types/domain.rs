@@ -1,4 +1,4 @@
-//! Data structures and Algorithms for defining the computational domain.
+//! Data structures and methods for defining the computational domain.
 use memoffset::offset_of;
 
 use mpi::{

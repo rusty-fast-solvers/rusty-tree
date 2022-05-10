@@ -1,4 +1,4 @@
-// C-API for the Morton Key Type
+//! Wrappers for methods on Morton Keys.
 
 use crate::types::{
     domain::Domain,

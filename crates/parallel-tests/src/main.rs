@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use mpi::{environment::Universe, topology::SystemCommunicator, traits::*};
+use mpi::{topology::SystemCommunicator, traits::*};
 
 use rand::prelude::*;
 use rand::SeedableRng;

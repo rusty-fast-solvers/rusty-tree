@@ -1,4 +1,4 @@
-//! Data structures and metbhods to create distributed Octrees with MPI.
+//! Data structures and methods to create distributed Octrees with MPI.
 
 use std::collections::{HashMap, HashSet};
 
@@ -204,7 +204,7 @@ impl DistributedTree {
         DistributedTree::assign_nodes_to_leaves(leaves, split_blocktree)
     }
 
-    /// Find the seeds at each processor [1].
+    /// Find the seeds, defined as coarsest leaf/leaves, at each processor [1].
     fn find_seeds(leaves: &[MortonKey]) -> Vec<MortonKey> {
         let min: MortonKey = *leaves.iter().min().unwrap();
         let max: MortonKey = *leaves.iter().max().unwrap();
@@ -225,7 +225,7 @@ impl DistributedTree {
         seeds
     }
 
-    // Transfer points based on the coarse distributed blocktree [REFERENCE ALGORITHM]
+    // Transfer points based on the coarse distributed blocktree.
     fn transfer_points_to_blocktree(
         world: &UserCommunicator,
         points: &[Point],

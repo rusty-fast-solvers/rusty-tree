@@ -1,4 +1,4 @@
-//! Data Strictires and Algorithms for Cartesian Points in 3D.
+//! Data structures and methods for Cartesian Points in 3D.
 
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
@@ -15,6 +15,8 @@ pub type PointType = f64;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
+/// A 3D cartesian point, described by coordinate, a unique global index, and the Morton Key for
+/// the octree node in which it lies. The ordering of Points is determined by their Morton Key.
 pub struct Point {
     pub coordinate: [PointType; 3],
     pub global_idx: usize,
