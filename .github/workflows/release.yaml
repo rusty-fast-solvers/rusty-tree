@@ -31,7 +31,7 @@ jobs:
 
       - name: Build
         shell: bash -l {0}
-        working-directory: .crates/rusty-tree/
+        working-directory: crates/rusty-tree/
         run: conda build -c conda-forge -c anaconda conda.recipe --py ${{ matrix.python-version }}
 
       - name: Install Anaconda Client
