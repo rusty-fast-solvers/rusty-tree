@@ -37,5 +37,5 @@ env MPICC=/path/to/mpicc python -m pip install mpi4py
 The Rust library can be added to your project's `Cargo.toml` from source.
 
 ```toml
-rusty_tree = { git = "https://github.com/rusty-fast-solvers/rusty-tree", branch = "main"}
+rusty-tree = { git = "https://github.com/rusty-fast-solvers/rusty-tree", branch = "main"}
 ```
