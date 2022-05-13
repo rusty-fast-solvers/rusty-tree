@@ -1,18 +1,14 @@
 //! Wrappers for Distributed Tree interface
 
-use mpi::{environment::Universe, ffi::MPI_Comm, topology::UserCommunicator, traits::*};
+use mpi::{ffi::MPI_Comm, topology::UserCommunicator, traits::*};
 
 use crate::{
     distributed::DistributedTree,
     types::{
-        domain::Domain,
         morton::MortonKey,
         point::{Point, PointType},
     },
 };
-
-use rand::prelude::*;
-use rand::SeedableRng;
 
 #[no_mangle]
 pub extern "C" fn distributed_tree_from_points(

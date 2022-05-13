@@ -35,7 +35,7 @@ pub struct DistributedTree {
 }
 
 impl DistributedTree {
-    /// Create a new DistributedOctree from a set of distributed points which define a domain.
+    /// Create a new DistributedTree from a set of distributed points which define a domain.
     pub fn new(
         points: &[[PointType; 3]],
         balanced: bool,

@@ -1,6 +1,8 @@
 name: Publish To Anaconda
 
-on: push
+on:
+  release:
+    types: [published]
 
 jobs:
   build:
