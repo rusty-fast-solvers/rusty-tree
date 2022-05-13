@@ -1,3 +1,6 @@
+"""
+Morton Keys allow for the creation of ordered space-filling 'z-ordered' curves.
+"""
 import numpy as np
 
 from rusty_tree import lib, ffi
@@ -10,38 +13,36 @@ class MortonKey:
 
         This constructor should not be used outside the class. Instead
         use the provided class methods to construct a MortonKey object.
+
+        Parameters
+        ----------
+        p_key: cdata 'struct <MortonKey> *'
+            Pointer to a MortonKey struct initialized in Rust.
         """
         self._p_key = p_key
 
     def __del__(self):
-        """Destructor to ensure that the C memory is cleaned up."""
         lib.morton_key_delete(self.ctype)
 
     def __repr__(self):
         return str({"morton": self.morton(), "anchor": self.anchor()})
 
     def __eq__(self, other):
-        """Implement == operator."""
         return self.morton == other.morton
 
     def __ne__(self, other):
-        """Implement != operator."""
         return self.morton != other.morton
 
     def __lt__(self, other):
-        """Implement < operator."""
         return self.morton < other.morton
 
     def __le__(self, other):
-        """Implement <= operator."""
         return self.morton <= other.morton
 
     def __gt__(self, other):
-        """Implement > operator."""
         return self.morton > other.morton
 
     def __ge__(self, other):
-        """Implement >= operator."""
         return self.morton >= other.morton
 
     def __hash__(self):
@@ -49,24 +50,48 @@ class MortonKey:
 
     @property
     def ctype(self):
-        """Give access to the underlying ctype."""
+        """
+        Give access to the underlying ctype.
+
+        Returns
+        -------
+        cdata 'struct <MortonKey> *'
+        """
         return self._p_key
 
     @classmethod
     def from_anchor(cls, anchor):
-        """Create a Morton key from a given anchor."""
+        """
+        Create a Morton key from a given anchor.
+
+        Returns
+        -------
+        MortonKey
+        """
         anchor = np.array(anchor, dtype=np.uint64)
         data = ffi.from_buffer("uint64_t(*)[3]", anchor)
         return cls(lib.morton_key_from_anchor(data))
 
     @classmethod
     def from_morton(cls, morton):
-        """Create a Morton key from a given Morton index."""
+        """
+        Create a Morton key from a given Morton index.
+
+        Returns
+        -------
+        MortonKey
+        """
         return cls(lib.morton_key_from_morton(morton))
 
     @classmethod
     def from_point(cls, point, origin, diameter):
-        """Create a Morton key from a point at the deepest level."""
+        """
+        Create a Morton key from a point at the deepest level.
+
+        Returns
+        -------
+        MortonKey
+        """
         point = np.array(point, dtype=np.float64)
         point_data = ffi.from_buffer("double(*)[3]", point)
 
@@ -79,15 +104,15 @@ class MortonKey:
         return cls(lib.morton_key_from_point(point_data, origin_data, diameter_data))
 
     def anchor(self):
-        """Return the anchor."""
+        """Return the anchor, with copy."""
         return np.array([*self.ctype.anchor], dtype=np.uint64)
 
     def morton(self):
-        """Return the Morton index."""
+        """Return the Morton index, without copy."""
         return self.ctype.morton
 
     def level(self):
-        """Return the level."""
+        """Return the level, without copy."""
         return lib.morton_key_level(self.ctype)
 
     def parent(self):
@@ -99,7 +124,7 @@ class MortonKey:
         return MortonKey(lib.morton_key_first_child(self.ctype))
 
     def children(self):
-        """Return the children."""
+        """Return the children, with copy."""
         ptr = np.empty(8, dtype=np.uint64)
         ptr_data = ffi.from_buffer("uintptr_t *", ptr)
         lib.morton_key_children(self.ctype, ptr_data)
@@ -109,6 +134,7 @@ class MortonKey:
         return children
 
     def ancestors(self):
+        """Return all ancestors, with copy."""
         curr = self
         ancestors = set()
         while curr.morton() != 0:
@@ -118,7 +144,7 @@ class MortonKey:
         return ancestors
 
     def siblings(self):
-        """Return all children of the parent."""
+        """Return all children of the parent, with copy."""
         return self.parent().children()
 
     def is_ancestor(self, other):

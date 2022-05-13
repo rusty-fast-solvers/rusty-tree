@@ -1,11 +1,10 @@
-// C-API for the Morton Key Type
+//! Wrappers for methods on Morton Keys.
 
 use crate::types::{
     domain::Domain,
-    morton::{MortonKey, KeyType},
-    point::PointType
+    morton::{KeyType, MortonKey},
+    point::PointType,
 };
-
 
 #[no_mangle]
 pub extern "C" fn morton_key_from_anchor(p_anchor: *const [KeyType; 3]) -> *mut MortonKey {
@@ -122,8 +121,7 @@ pub extern "C" fn morton_key_key_in_direction(
     let shifted_key = unsafe { (*p_morton).find_key_in_direction(direction) };
 
     match shifted_key {
-        Some(key) =>
-            Box::into_raw(Box::new(key)),
+        Some(key) => Box::into_raw(Box::new(key)),
 
         None => std::ptr::null_mut(),
     }
@@ -134,7 +132,7 @@ pub extern "C" fn morton_key_is_ancestor(
     p_morton: *mut MortonKey,
     p_other: *mut MortonKey,
 ) -> bool {
-    unsafe { (*p_morton).is_ancestor(&*p_other)}
+    unsafe { (*p_morton).is_ancestor(&*p_other) }
 }
 
 #[no_mangle]
@@ -142,9 +140,8 @@ pub extern "C" fn morton_key_is_descendent(
     p_morton: *mut MortonKey,
     p_other: *mut MortonKey,
 ) -> bool {
-    unsafe { (*p_morton).is_descendent(&*p_other)}
+    unsafe { (*p_morton).is_descendent(&*p_other) }
 }
-
 
 #[no_mangle]
 pub extern "C" fn morton_key_delete(p_morton_key: *mut MortonKey) {
@@ -155,7 +152,7 @@ pub extern "C" fn morton_key_delete(p_morton_key: *mut MortonKey) {
 
 #[no_mangle]
 pub extern "C" fn morton_key_next(ptr: *const MortonKey) -> *mut &'static MortonKey {
-    let mut slice = unsafe {std::slice::from_raw_parts(ptr, 2).iter()};
+    let mut slice = unsafe { std::slice::from_raw_parts(ptr, 2).iter() };
     slice.next();
     let next = slice.next().unwrap();
     Box::into_raw(Box::new(next))
@@ -167,12 +164,12 @@ pub extern "C" fn morton_key_clone(
     data_ptr: *mut usize,
     len: usize,
     start: usize,
-    stop: usize
+    stop: usize,
 ) {
-    let slice = unsafe {std::slice::from_raw_parts(ptr, len)};
+    let slice = unsafe { std::slice::from_raw_parts(ptr, len) };
 
-    let nslice = stop-start;
-    let boxes = unsafe {std::slice::from_raw_parts_mut(data_ptr, nslice)};
+    let nslice = stop - start;
+    let boxes = unsafe { std::slice::from_raw_parts_mut(data_ptr, nslice) };
 
     let mut jdx = 0;
     for idx in start..stop {
@@ -182,7 +179,11 @@ pub extern "C" fn morton_key_clone(
 }
 
 #[no_mangle]
-pub extern "C" fn morton_key_index(ptr: *const MortonKey, len: usize, idx: usize) -> *mut &'static MortonKey {
-    let slice = unsafe {std::slice::from_raw_parts(ptr, len)};
+pub extern "C" fn morton_key_index(
+    ptr: *const MortonKey,
+    len: usize,
+    idx: usize,
+) -> *mut &'static MortonKey {
+    let slice = unsafe { std::slice::from_raw_parts(ptr, len) };
     Box::into_raw(Box::new(&slice[idx]))
 }

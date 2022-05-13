@@ -1,0 +1,14 @@
+name: build
+channels:
+  - conda-forge
+  - anaconda
+dependencies:
+  - gcc # [linux]
+  - clang
+  - mpich-mpicc
+  - conda-build
+  - rust
+  - python
+  - pip
+  - maturin
+  - cffi >=1.15

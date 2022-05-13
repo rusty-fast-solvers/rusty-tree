@@ -1,0 +1,51 @@
+name: Publish To Anaconda
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    name: Build (${{ matrix.python-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest", "macos-latest"]
+        python-version: ["3.8", "3.9", "3.10"]
+
+    steps:
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          python-version: ${{ matrix.python-version }}
+
+      - uses: actions/checkout@v3
+
+      - name: Install Conda Build
+        shell: bash -l {0}
+        run: conda install conda-build
+
+      - name: Install Conda Verify
+        shell: bash -l {0}
+        run: |
+          conda install conda-verify
+
+      - name: Build
+        shell: bash -l {0}
+        working-directory: crates/rusty-tree/
+        run: conda build -c conda-forge -c anaconda conda.recipe --py ${{ matrix.python-version }}
+
+      - name: Install Anaconda Client
+        shell: bash -l {0}
+        run: conda install anaconda-client
+
+      - name: Upload Linux (${{ matrix.python-version }})
+        if: runner.os == 'Linux'
+        shell: bash -l {0}
+        run: anaconda -t ${{ secrets.ANACONDA }} upload --force --user skailasa  /usr/share/miniconda/envs/test/conda-bld/linux-64/rusty_tree-*.tar.bz2
+
+      - name: Upload Mac (${{ matrix.python-version }})
+        if: runner.os == 'macOS'
+        shell: bash -l {0}
+        run: anaconda -t ${{ secrets.ANACONDA }} upload --force --user skailasa  /usr/local/miniconda/envs/test/conda-bld/osx-64/rusty_tree-*.tar.bz2

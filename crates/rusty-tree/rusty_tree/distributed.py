@@ -1,18 +1,19 @@
 """
-Distributed Tree.
+The DistributedTree object acts as the interface for creating octrees.
 """
 from mpi4py import MPI
 import numpy as np
 
 from rusty_tree import lib, ffi
-from rusty_tree.types.morton import MortonKey
-from rusty_tree.types.point import Point
 from rusty_tree.types.iterator import Iterator
 
 
 class DistributedTree:
     """
-    Wrapper a DistributedTree structure from Rust.
+    Wrapper for a DistributedTree structure in Rust. Used to create octrees
+    distributed via MPI from a set of N distributed Cartesian points with shape
+    (N,3) stored in NumPy arrays on each processor. Trees can optionally be
+    balanced.
 
     Example Usage:
     --------------
@@ -27,15 +28,28 @@ class DistributedTree:
     >>> # Initialize points at the current processor
     >>> points = np.random.rand(1000, 3)
 
-    >>> # Create a balanced, distributed, tree from a set of globally distributed points
+    >>> # Create a balanced, distributed, tree from a set of globally
+    >>> # distributed points
     >>> tree = DistributedTree.from_global_points(points, True, comm)
     """
 
     def __init__(self, p_tree, comm, p_comm, raw_comm):
         """
-        Don't directly use constructor, instead use the provided class method to create
-        a DistributedTree from a set of points, distributed globally across the set of
-        processors provided to the constructor via its communicator.
+        Don't directly use constructor, instead use the provided class method
+        to create a DistributedTree from a set of points, distributed globally
+        across the set of processors provided to the constructor via its
+        communicator.
+
+        Parameters
+        ----------
+        p_tree: cdata 'struct <DistributedTree> *'
+            Pointer to a DistributedTree struct initialized in Rust.
+        comm: mpi4py.MPI.Intracomm
+            MPI world communicator, created using mpi4py.
+        p_comm: cdata '*MPI_Comm'
+            Pointer to underlying C communicator.
+        raw_comm: cdata 'MPI_Comm'
+            Underlying C communicator.
         """
         self.ctype = p_tree
         self.nkeys = lib.distributed_tree_nkeys(self.ctype)
@@ -56,14 +70,18 @@ class DistributedTree:
         """
         Construct a distributed tree from a set of globally distributed points.
 
-        Params:
-        ------
+        Parameters
+        ----------
         points : np.array(shape=(n_points, 3), dtype=np.float64)
             Cartesian points at this processor.
         balanced : bool
             If 'True' constructs a balanced tree, if 'False' constructs an unbalanced tree.
-        comm : Intracomm
-           An mpi4py Intracommunicator.
+        comm: mpi4py.MPI.Intracomm
+            MPI world communicator, created using mpi4py.
+
+        Returns
+        -------
+        DistributedTree
         """
         points = np.array(points, dtype=np.float64, order="C", copy=False)
         npoints, _ = points.shape

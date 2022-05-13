@@ -1,0 +1,28 @@
+package:
+  name: rusty_tree
+  version: 1.0.0
+
+source:
+  path: ../
+
+requirements:
+  build:
+    - gcc # [linux]
+    - clang
+
+  host:
+    - mpich-mpicc
+    - rust
+    - python
+    - pip
+    - maturin
+    - cffi >=1.15
+
+  run:
+    - mpich-mpicc
+    - python
+    - numpy 1.22.2
+    - cffi >=1.15
+
+build:
+  script: maturin build --release && python -m pip install .

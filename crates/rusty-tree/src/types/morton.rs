@@ -1,4 +1,4 @@
-//! Datastructure and Algorithms for Morton Keys.
+//! Data structures and methods for Morton Keys.
 
 use itertools::izip;
 
@@ -8,30 +8,26 @@ use std::hash::{Hash, Hasher};
 
 use memoffset::offset_of;
 use mpi::{
+    datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
     Address,
-    datatype::{
-        Equivalence, UncommittedUserDatatype, UserDatatype
-    }
 };
 
 use crate::{
     constants::{
-        DEEPEST_LEVEL, LEVEL_SIZE, DIRECTIONS, BYTE_DISPLACEMENT, BYTE_MASK, Z_LOOKUP_ENCODE,
-        Z_LOOKUP_DECODE, X_LOOKUP_ENCODE, X_LOOKUP_DECODE, Y_LOOKUP_ENCODE, Y_LOOKUP_DECODE,
-        LEVEL_DISPLACEMENT, LEVEL_MASK, NINE_BIT_MASK
+        BYTE_DISPLACEMENT, BYTE_MASK, DEEPEST_LEVEL, DIRECTIONS, LEVEL_DISPLACEMENT, LEVEL_MASK,
+        LEVEL_SIZE, NINE_BIT_MASK, X_LOOKUP_DECODE, X_LOOKUP_ENCODE, Y_LOOKUP_DECODE,
+        Y_LOOKUP_ENCODE, Z_LOOKUP_DECODE, Z_LOOKUP_ENCODE,
     },
-    types::{
-        domain::Domain,
-        point::PointType,
-    }
+    types::{domain::Domain, point::PointType},
 };
-
 
 pub type KeyType = u64;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
-/// Representation of a Morton key.
+/// Representation of a Morton key with an 'anchor' specifying the origin of the node it encodes
+/// with respect to the deepest level of the octree, as well as 'morton', a bit-interleaved single
+/// integer representation.
 pub struct MortonKey {
     pub anchor: [KeyType; 3],
     pub morton: KeyType,
@@ -44,16 +40,15 @@ unsafe impl Equivalence for MortonKey {
             &[1, 1],
             &[
                 offset_of!(MortonKey, anchor) as Address,
-                offset_of!(MortonKey, morton) as Address
+                offset_of!(MortonKey, morton) as Address,
             ],
             &[
                 UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype()).as_ref(),
                 UncommittedUserDatatype::contiguous(1, &KeyType::equivalent_datatype()).as_ref(),
-            ]
+            ],
         )
     }
 }
-
 
 impl MortonKey {
     /// Return the anchor
@@ -141,7 +136,8 @@ impl MortonKey {
             flc
         } else {
             *self
-        }}
+        }
+    }
 
     /// Return all children in order of their Morton indices
     pub fn children(&self) -> Vec<MortonKey> {
@@ -365,7 +361,7 @@ impl Ord for MortonKey {
 
 impl PartialOrd for MortonKey {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-    //    less_than(self, other)
+        //    less_than(self, other)
         Some(self.morton.cmp(&other.morton))
     }
 }
@@ -475,8 +471,7 @@ mod tests {
     /// `a` is less than key `b`, this function evaluates to true.
     fn less_than(a: &MortonKey, b: &MortonKey) -> Option<bool> {
         // If anchors match, the one at the coarser level has the lesser Morton id.
-        let same_anchor =
-            (a.anchor[0] == b.anchor[0])
+        let same_anchor = (a.anchor[0] == b.anchor[0])
             & (a.anchor[1] == b.anchor[1])
             & (a.anchor[2] == b.anchor[2]);
 
@@ -492,7 +487,7 @@ mod tests {
                 let x = vec![
                     a.anchor[0] ^ b.anchor[0],
                     a.anchor[1] ^ b.anchor[1],
-                    a.anchor[2] ^ b.anchor[2]
+                    a.anchor[2] ^ b.anchor[2],
                 ];
 
                 let mut argmax = 0;
@@ -617,7 +612,6 @@ mod tests {
 
     #[test]
     fn test_sorting() {
-
         let npoints = 1000;
         let mut range = rand::thread_rng();
         let mut points: Vec<[PointType; 3]> = Vec::new();
@@ -626,9 +620,9 @@ mod tests {
             points.push([range.gen(), range.gen(), range.gen()]);
         }
 
-        let domain = Domain{
+        let domain = Domain {
             origin: [0., 0., 0.],
-            diameter: [1., 1., 1.]
+            diameter: [1., 1., 1.],
         };
 
         let mut keys: Vec<MortonKey> = points
@@ -637,13 +631,13 @@ mod tests {
             .collect();
 
         keys.sort();
-        let mut tree = Tree{keys};
+        let mut tree = Tree { keys };
         tree.linearize();
 
         // Test that Z order is maintained when sorted
         for i in 0..(tree.keys.len() - 1) {
             let a = tree.keys[i];
-            let b = tree.keys[i+1];
+            let b = tree.keys[i + 1];
 
             assert!(less_than(&a, &b).unwrap() | (a == b));
         }
@@ -653,19 +647,43 @@ mod tests {
     fn test_find_children() {
         let key = MortonKey {
             morton: 0,
-            anchor: [0, 0, 0]
+            anchor: [0, 0, 0],
         };
-        let displacement = 1 << (DEEPEST_LEVEL-key.level()-1);
+        let displacement = 1 << (DEEPEST_LEVEL - key.level() - 1);
 
         let expected: Vec<MortonKey> = vec![
-            MortonKey{anchor: [0, 0, 0], morton: 1},
-            MortonKey{anchor: [displacement, 0, 0], morton: 0b100000000000000000000000000000000000000000000000000000000000001},
-            MortonKey{anchor: [0, displacement, 0], morton: 0b10000000000000000000000000000000000000000000000000000000000001},
-            MortonKey{anchor: [0, 0, displacement], morton: 0b1000000000000000000000000000000000000000000000000000000000001},
-            MortonKey{anchor: [displacement, displacement, 0], morton: 0b110000000000000000000000000000000000000000000000000000000000001},
-            MortonKey{anchor: [displacement, 0, displacement], morton: 0b101000000000000000000000000000000000000000000000000000000000001},
-            MortonKey{anchor: [0, displacement, displacement], morton: 0b11000000000000000000000000000000000000000000000000000000000001},
-            MortonKey{anchor: [displacement, displacement, displacement], morton: 0b111000000000000000000000000000000000000000000000000000000000001},
+            MortonKey {
+                anchor: [0, 0, 0],
+                morton: 1,
+            },
+            MortonKey {
+                anchor: [displacement, 0, 0],
+                morton: 0b100000000000000000000000000000000000000000000000000000000000001,
+            },
+            MortonKey {
+                anchor: [0, displacement, 0],
+                morton: 0b10000000000000000000000000000000000000000000000000000000000001,
+            },
+            MortonKey {
+                anchor: [0, 0, displacement],
+                morton: 0b1000000000000000000000000000000000000000000000000000000000001,
+            },
+            MortonKey {
+                anchor: [displacement, displacement, 0],
+                morton: 0b110000000000000000000000000000000000000000000000000000000000001,
+            },
+            MortonKey {
+                anchor: [displacement, 0, displacement],
+                morton: 0b101000000000000000000000000000000000000000000000000000000000001,
+            },
+            MortonKey {
+                anchor: [0, displacement, displacement],
+                morton: 0b11000000000000000000000000000000000000000000000000000000000001,
+            },
+            MortonKey {
+                anchor: [displacement, displacement, displacement],
+                morton: 0b111000000000000000000000000000000000000000000000000000000000001,
+            },
         ];
 
         let children = key.children();
@@ -680,7 +698,7 @@ mod tests {
     fn test_ancestors() {
         let domain: Domain = Domain {
             origin: [0., 0., 0.],
-            diameter: [1., 1., 1.]
+            diameter: [1., 1., 1.],
         };
         let point = [0.5, 0.5, 0.5];
 
@@ -703,24 +721,42 @@ mod tests {
     #[test]
     pub fn test_finest_ancestor() {
         // Trivial case
-        let key: MortonKey = MortonKey { anchor: [0, 0, 0], morton: 0};
+        let key: MortonKey = MortonKey {
+            anchor: [0, 0, 0],
+            morton: 0,
+        };
         let result = key.finest_ancestor(&key);
-        let expected : MortonKey = MortonKey { anchor: [0, 0, 0], morton: 0};
+        let expected: MortonKey = MortonKey {
+            anchor: [0, 0, 0],
+            morton: 0,
+        };
         assert!(result == expected);
 
         // Standard case
-        let displacement = 1 << (DEEPEST_LEVEL-key.level()-1);
-        let a: MortonKey = MortonKey { anchor: [0, 0, 0], morton: 16};
-        let b: MortonKey = MortonKey {anchor: [displacement, displacement, displacement], morton: 0b111000000000000000000000000000000000000000000000000000000000001};
+        let displacement = 1 << (DEEPEST_LEVEL - key.level() - 1);
+        let a: MortonKey = MortonKey {
+            anchor: [0, 0, 0],
+            morton: 16,
+        };
+        let b: MortonKey = MortonKey {
+            anchor: [displacement, displacement, displacement],
+            morton: 0b111000000000000000000000000000000000000000000000000000000000001,
+        };
         let result = a.finest_ancestor(&b);
-        let expected : MortonKey = MortonKey { anchor: [0, 0, 0], morton: 0};
+        let expected: MortonKey = MortonKey {
+            anchor: [0, 0, 0],
+            morton: 0,
+        };
         assert!(result == expected);
     }
 
     #[test]
     pub fn test_find_key_in_direct() {
         let point = [0.5, 0.5, 0.5];
-        let domain: Domain = Domain {diameter: [1., 1., 1.], origin: [0., 0., 0.]};
+        let domain: Domain = Domain {
+            diameter: [1., 1., 1.],
+            origin: [0., 0., 0.],
+        };
 
         let key = MortonKey::from_point(&point, &domain);
         let direction = [1, 0, 0];
@@ -729,7 +765,10 @@ mod tests {
     #[test]
     pub fn test_neighbors() {
         let point = [0.5, 0.5, 0.5];
-        let domain: Domain = Domain {diameter: [1., 1., 1.], origin: [0., 0., 0.]};
+        let domain: Domain = Domain {
+            diameter: [1., 1., 1.],
+            origin: [0., 0., 0.],
+        };
         let key = MortonKey::from_point(&point, &domain);
         let ancestors: Vec<MortonKey> = key.ancestors().into_iter().collect();
 
@@ -775,11 +814,13 @@ mod tests {
 
             let mut expected: Vec<MortonKey> = expected
                 .iter()
-                .map(|n| [
-                    (n[0]+(anchor[0] as i64)) as u64,
-                    (n[1]+(anchor[1] as i64)) as u64,
-                    (n[2]+(anchor[2] as i64)) as u64,
-                    ])
+                .map(|n| {
+                    [
+                        (n[0] + (anchor[0] as i64)) as u64,
+                        (n[1] + (anchor[1] as i64)) as u64,
+                        (n[2] + (anchor[2] as i64)) as u64,
+                    ]
+                })
                 .map(|anchor| MortonKey::from_anchor(&anchor))
                 .collect();
             expected.sort();
@@ -832,16 +873,18 @@ mod tests {
 
             let mut expected: Vec<MortonKey> = expected
                 .iter()
-                .map(|n| [
-                    (n[0]+(anchor[0] as i64)) as u64,
-                    (n[1]+(anchor[1] as i64)) as u64,
-                    (n[2]+(anchor[2] as i64)) as u64,
-                    ])
+                .map(|n| {
+                    [
+                        (n[0] + (anchor[0] as i64)) as u64,
+                        (n[1] + (anchor[1] as i64)) as u64,
+                        (n[2] + (anchor[2] as i64)) as u64,
+                    ]
+                })
                 .map(|anchor| MortonKey::from_anchor(&anchor))
-                .map(
-                    |key| MortonKey{
+                .map(|key| MortonKey {
                     anchor: key.anchor,
-                    morton: ((key.morton >> LEVEL_DISPLACEMENT) << LEVEL_DISPLACEMENT) | parent.level()
+                    morton: ((key.morton >> LEVEL_DISPLACEMENT) << LEVEL_DISPLACEMENT)
+                        | parent.level(),
                 })
                 .collect();
             expected.sort();
@@ -850,6 +893,5 @@ mod tests {
                 assert!(expected[i] == result[i]);
             }
         }
-
     }
 }

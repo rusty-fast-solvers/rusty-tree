@@ -1,155 +1,41 @@
 # Rusty Tree
 
-Implementation of Octrees [1] in Rust with Python interfaces.
+[![Anaconda-Server Badge](https://anaconda.org/skailasa/rusty_tree/badges/platforms.svg)](https://anaconda.org/skailasa/rusty_tree) [![Anaconda-Server Badge](https://anaconda.org/skailasa/rusty_tree/badges/latest_release_date.svg)](https://anaconda.org/skailasa/rusty_tree) [![Anaconda-Server Badge](https://anaconda.org/skailasa/rusty_tree/badges/version.svg)](https://anaconda.org/skailasa/rusty_tree)
 
-# Python Library
+Implementation of distributed Octrees in Rust with Python interfaces for
+Scientific Computing.
 
-Install and use from Anaconda, relies on a working MPI implementation on your system.
+Usage examples and build instructions can be found in the
+[project wiki](https://github.com/rusty-fast-solvers/rusty-tree/wiki).
+
+## Install
+
+The Conda package installs all required dependencies including MPI. Installing
+only the Rust package relies on a correctly configured MPI installation on your
+system. Specifically, it should support the [`mpicc -show`](https://github.com/rsmpi/rsmpi)
+command
+
+### Python
+
+Install Python package from Anaconda Cloud into a Conda environment.
 
 ```bash
 conda install -c skailasa rusty_tree
 ```
 
-## Build
+Install mpi4py dependency separately, to ensure that correct pointers are
+created to shared libraries when installing into a virtual environment
 
-```bash
-cd crates/rusty-tree/ && maturin develop --release
+```
+env MPICC=/path/to/mpicc python -m pip install mpi4py
 ```
 
-## Usage
+**Installation requires that your channel list contains `conda-forge`.**=
 
-Write a script:
+### Rust
 
-```python
-from mpi4py import MPI
-import numpy as np
+The Rust library can be added to your project's `Cargo.toml` from source.
 
-from rusty_tree.distributed import DistributedTree
-
-
-# Setup communicator
-comm = MPI.COMM_WORLD
-
-# Cartesian points at this process
-points = np.random.rand(100000, 3)
-
-# Generate a balanced tree
-balanced = DistributedTree.from_global_points(points, True, comm)
-
-# Generate an unbalanced tree
-unbalanced = DistributedTree.from_global_points(points, False, comm)
-
-# Trees implement iterator protocol as well as slicing and indexing 
-# (without copy of underlying Rust data)
-
-# Slice of 10 keys
-key_slice = balanced.keys[:10]
-
-# Slice of 10 points
-point_slice = balanced.points[:10]
-
-for key in key_slice:
-    foo(key)
-
-# Copy only performed when printing in Python
-print(point_slice)
-print(key_slice)
+```toml
+rusty_tree = { git = "https://github.com/rusty-fast-solvers/rusty-tree", branch = "main"}
 ```
-
-Run a script using mpi4py (specified in requirements)
-
-```bash
-mpiexec -n <nprocs> python -m mpi4py /path/to/script/
-```
-
-# Rust Library
-
-## Build
-
-```bash
-# Build crates
-cargo build
-```
-
-## Usage
-
-```rust
-use rand::prelude::*;
-use rand::SeedableRng;
-
-use mpi::{
-    environment::Universe,
-    topology::{Color, UserCommunicator},
-    traits::*
-};
-
-use rusty_tree::{
-    constants::{NCRIT, ROOT},
-    distributed::DistributedTree,
-    types::{
-        domain::Domain,
-        morton::MortonKey
-        point::PointType,
-    },
-};
-
-
-fn main () {
-    // Generate a set of randomly distributed points
-    let mut range = StdRng::seed_from_u64(0);
-    let between = rand::distributions::Uniform::from(0.0..1.0);
-    let mut points: Vec<[PointType; 3]> = Vec::new();
-    let npoints = 1000000;
-
-    for _ in 0..npoints {
-        points.push([
-            between.sample(&mut range),
-            between.sample(&mut range),
-            between.sample(&mut range),
-        ])
-    }
-
-    // Setup an MPI environment
-    let universe: Universe = mpi::initialize().unwrap();
-    let comm: UserCommunicator = universe.world();
-    let comm = comm.split_by_color(Color::with_value(0)).unwrap();
-
-    // Unbalanced
-    let unbalanced: DistributedTree = DistributedTree::new(&points, false, &comm)
-
-    // Balanced
-    let balanced_tree: DistributedTree = DistributedTree::new(&points, true, &comm)
-}
-```
-
-## Test
-
-Tests for serial code managed by Cargo
-
-```bash
-cargo test
-```
-
-Parallel functionality is tested via the binary `parallel-tests` crate.
-
-```bash
-mpirun -n <nprocs> ./target/<release/debug>/parallel-tests
-```
-
-## Citation
-
-```bash
-@software{rusty-tree,
-  author = {{Timo Betcke, Srinath Kailasa}},
-  title = {Rusty Tree,
-  url = {https://github.com/rusty-fast-solveres/rusty-tree},
-  version = {0.1.0},
-  date = {2022-03-20},
-}
-```
-
-### References
-
-[1] Sundar, Hari, Rahul S. Sampath, and George Biros. "Bottom-up construction and 2: 1 balance refinement of linear octrees in parallel." SIAM Journal on Scientific Computing 30.5 (2008): 2675-2708.
-
-[2] Sundar, Hari, Dhairya Malhotra, and George Biros. "Hyksort: a new variant of hypercube quicksort on distributed memory architectures." Proceedings of the 27th international ACM conference on international conference on supercomputing. 2013.
