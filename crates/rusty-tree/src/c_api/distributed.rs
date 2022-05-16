@@ -1,5 +1,4 @@
 //! Wrappers for Distributed Tree interface
-
 use mpi::{ffi::MPI_Comm, topology::UserCommunicator, traits::*};
 
 use crate::{
@@ -8,6 +7,7 @@ use crate::{
         morton::MortonKey,
         point::{Point, PointType},
     },
+    data::VTK,
 };
 
 #[no_mangle]
@@ -52,4 +52,10 @@ pub extern "C" fn distributed_tree_points(p_tree: *const DistributedTree) -> *co
 pub extern "C" fn distributed_tree_balanced(p_tree: *const DistributedTree) -> bool {
     let tree = unsafe { &*p_tree };
     tree.balanced
+}
+
+#[no_mangle]
+pub extern "C" fn distributed_tree_to_vtk(p_tree: *const DistributedTree, filename: String) {
+    let tree = unsafe { &*p_tree };
+    tree.keys.to_vtk(filename);
 }
