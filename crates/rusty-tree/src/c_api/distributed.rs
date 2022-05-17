@@ -54,8 +54,8 @@ pub extern "C" fn distributed_tree_balanced(p_tree: *const DistributedTree) -> b
     tree.balanced
 }
 
-#[no_mangle]
-pub extern "C" fn distributed_tree_to_vtk(p_tree: *const DistributedTree, filename: String) {
-    let tree = unsafe { &*p_tree };
-    tree.keys.to_vtk(filename);
-}
+// #[no_mangle]
+// pub extern "C" fn distributed_tree_to_vtk(p_tree: *const DistributedTree, filename: String) {
+//     let tree = unsafe { &*p_tree };
+//     tree.keys.to_vtk(filename);
+// }

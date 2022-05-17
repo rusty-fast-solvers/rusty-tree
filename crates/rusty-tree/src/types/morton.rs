@@ -1,6 +1,7 @@
 //! Data structures and methods for Morton Keys.
 
 use itertools::izip;
+use serde::{Serialize, Deserialize};
 
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -18,13 +19,14 @@ use crate::{
         LEVEL_SIZE, NINE_BIT_MASK, X_LOOKUP_DECODE, X_LOOKUP_ENCODE, Y_LOOKUP_DECODE,
         Y_LOOKUP_ENCODE, Z_LOOKUP_DECODE, Z_LOOKUP_ENCODE,
     },
+    data::JSON,
     types::{domain::Domain, point::PointType},
 };
 
 pub type KeyType = u64;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
 /// Representation of a Morton key with an 'anchor' specifying the origin of the node it encodes
 /// with respect to the deepest level of the octree, as well as 'morton', a bit-interleaved single
 /// integer representation.
@@ -371,6 +373,8 @@ impl Hash for MortonKey {
         self.morton.hash(state);
     }
 }
+
+impl JSON for Vec<MortonKey> {}
 
 /// Return the level associated with a key.
 fn find_level(morton: KeyType) -> KeyType {

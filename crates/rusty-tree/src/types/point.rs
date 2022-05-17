@@ -1,4 +1,5 @@
 //! Data structures and methods for Cartesian Points in 3D.
+use serde::{Serialize, Deserialize};
 
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
@@ -9,12 +10,24 @@ use mpi::{
     Address,
 };
 
-use crate::types::morton::{KeyType, MortonKey};
+use crate::{
+    data::JSON,
+    types::morton::{KeyType, MortonKey}
+};
+
+use std::path::PathBuf;
+use std::error::Error;
+use std::fs::File;
+use std::io::BufReader;
+use std::io::BufWriter;
+use std::path::Path;
+use std::io;
+use std::io::prelude::*;
 
 pub type PointType = f64;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
 /// A 3D cartesian point, described by coordinate, a unique global index, and the Morton Key for
 /// the octree node in which it lies. The ordering of Points is determined by their Morton Key.
 pub struct Point {
@@ -25,6 +38,7 @@ pub struct Point {
 
 /// Vector of **Points**.
 pub type Points = Vec<Point>;
+
 
 unsafe impl Equivalence for Point {
     type Out = UserDatatype;
@@ -84,3 +98,5 @@ impl Hash for Point {
         self.key.hash(state);
     }
 }
+
+impl JSON for Vec<Point> {}
