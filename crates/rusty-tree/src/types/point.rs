@@ -1,33 +1,27 @@
 //! Data structures and methods for Cartesian Points in 3D.
-use serde::{Serialize, Deserialize};
 
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
+use std::path::Path;
 
 use memoffset::offset_of;
 use mpi::{
     datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
     Address,
 };
+use serde::{Serialize, Deserialize};
+use hdf5::H5Type;
 
 use crate::{
-    data::JSON,
+    data::{JSON, HDF5},
     types::morton::{KeyType, MortonKey}
 };
 
-use std::path::PathBuf;
-use std::error::Error;
-use std::fs::File;
-use std::io::BufReader;
-use std::io::BufWriter;
-use std::path::Path;
-use std::io;
-use std::io::prelude::*;
 
 pub type PointType = f64;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, H5Type)]
 /// A 3D cartesian point, described by coordinate, a unique global index, and the Morton Key for
 /// the octree node in which it lies. The ordering of Points is determined by their Morton Key.
 pub struct Point {
@@ -100,3 +94,23 @@ impl Hash for Point {
 }
 
 impl JSON for Vec<Point> {}
+
+impl HDF5<Point> for Vec<Point> {
+    fn write_hdf5<P: AsRef<Path>>(&self, filename: P) -> hdf5::Result<()>
+    {
+        let file = hdf5::File::create(filename)?;
+        let points = file.new_dataset::<Point>().create("points")?;
+        points.write(self)?;
+
+        Ok(())
+    }
+
+    fn read_hdf5<P: AsRef<Path>>(filepath: P) -> hdf5::Result<Vec<Point>>
+    {
+        let file = hdf5::File::open(filepath)?;
+        let points = file.dataset("points")?;
+        let points: Vec<Point> = points.read_raw::<Point>()?;
+
+        Ok(points)
+    }
+}
