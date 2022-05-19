@@ -20,6 +20,7 @@ use crate::types::{
 
 // VTK compatible dataset for visualization
 pub trait VTK {
+
     // Convert a data set to VTK format.
     fn write_vtk(&self, filename: String, domain: &Domain);
 }

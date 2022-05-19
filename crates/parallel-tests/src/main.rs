@@ -194,19 +194,4 @@ fn main() {
     if rank == 0 {
         println!("test_global_bounds ... passed");
     }
-
-    // Print VTK
-    let points = points_fixture();
-    let comm = world.duplicate();
-    let domain = Domain::from_global_points(&points, &comm);
-
-    let set: HashSet<MortonKey> = balanced.keys.clone().drain(..).collect();
-    let vec: Vec<MortonKey> = set.into_iter().collect();
-    // let root = MortonKey {
-    //     anchor: [0, 0, 0],
-    //     morton: 0
-    // };
-    // let vec = root.children();
-    // println!("unbalanced {:?}", vec);
-    vec.write_vtk("test.vtk".to_string(), &domain);
 }

@@ -404,7 +404,9 @@ impl HDF5<MortonKey> for Vec<MortonKey> {
     }
 }
 
-pub fn serialize_box_from_key(key: MortonKey, domain: &Domain) -> Vec<f64> {
+
+/// Serialize a Morton Key for VTK visualization.
+fn serialize_morton_key(key: MortonKey, domain: &Domain) -> Vec<f64> {
     let anchor = key.anchor;
 
     let mut serialized = Vec::<PointType>::with_capacity(24);
@@ -432,34 +434,37 @@ pub fn serialize_box_from_key(key: MortonKey, domain: &Domain) -> Vec<f64> {
     serialized
 }
 
+// VTK output.
 impl VTK for Vec<MortonKey> {
-    fn write_vtk(&self, filename: String, domain: &Domain){
 
-        let num_keys = self.len();
+    // Save data to a VTK file for visualization.
+    fn write_vtk(&self, filename: String, domain: &Domain)
+    {
+        let n_keys = self.len();
 
         // We use a vtk voxel type, which has
         // 8 points per cell, i.e. 24 float numbers
         // per cell.
-        let num_floats = 3 * 8 * num_keys;
+        let num_floats = 3 * 8 * n_keys;
         let mut cell_points = Vec::<f64>::with_capacity(num_floats);
 
         for &key in self {
-            let serialized = serialize_box_from_key(key, domain);
+            let serialized = serialize_morton_key(key, domain);
             cell_points.extend(serialized);
         }
 
-        let num_points = 8 * (num_keys as u64); // + (num_particles as u64);
+        let num_points = 8 * (n_keys as u64); // + (num_particles as u64);
 
         let connectivity = Vec::<u64>::from_iter(0..num_points);
-        let mut offsets = Vec::<u64>::from_iter((0..(num_keys as u64)).map(|item| 8 * item + 8));
+        let mut offsets = Vec::<u64>::from_iter((0..(n_keys as u64)).map(|item| 8 * item + 8));
         offsets.push(num_points);
 
-        let mut types = vec![CellType::Voxel; num_keys];
+        let mut types = vec![CellType::Voxel; n_keys];
         types.push(CellType::PolyVertex);
 
         let mut cell_data = Vec::<i32>::with_capacity(num_points as usize);
 
-        for _ in 0..num_keys {
+        for _ in 0..n_keys {
             cell_data.push(0);
         }
         cell_data.push(1);
@@ -481,7 +486,7 @@ impl VTK for Vec<MortonKey> {
                 data: Attributes {
                     point: vec![],
                     cell: vec![Attribute::DataArray(DataArrayBase {
-                        name: String::from("colors"),
+                        name: String::from("nodes"),
                         elem: ElementType::Scalars {
                             num_comp: 1,
                             lookup_table: None,
