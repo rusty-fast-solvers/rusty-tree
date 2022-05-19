@@ -1,65 +1,28 @@
-//! Functions for data io and manipulation.
-use vtkio::model::*;
-
-use std::path::PathBuf;
-use std::error::Error;
+//! Data IO.
 use std::fs::File;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::path::Path;
 
-use crate::types::{
-    morton::MortonKey, point::Point
-};
+use std::iter::FromIterator;
+use vtkio::model::*;
+use std::path::PathBuf;
 
-use serde::{Serialize, Deserialize};
+use serde::Serialize;
+
+
+use crate::types::{
+    point::PointType,
+    morton::MortonKey,
+    domain::Domain
+};
 
 
 // VTK compatible dataset for visualization
 pub trait VTK {
     // Convert a data set to VTK format.
-    fn to_vtk(&self, filename: String);
+    fn write_vtk(&self, filename: String, domain: &Domain);
 }
-
-// impl VTK for Vec<MortonKey> {
-//     fn to_vtk(&self, filename: String){
-
-//         let data = Vec::<i32>::new();
-
-//         let model = Vtk {
-//             title: String::new(),
-//             version: Version { major: 1, minor: 0 },
-//             file_path:Some(PathBuf::from(&filename)),
-//             byte_order: ByteOrder::BigEndian,
-//             data: DataSet::inline(UnstructuredGridPiece {
-//                 points: None,
-//                 cells: None,
-//                 data: None,
-//             }),
-//         };
-
-//         model.export(filename).unwrap();
-//     }
-// }
-
-// impl VTK for Vec<Point> {
-//     fn to_vtk(&self, filename: String){
-
-//         let model = Vtk {
-//             title: String::new(),
-//             version: Version { major: 1, minor: 0 },
-//             file_path:Some(PathBuf::from(&filename)),
-//             byte_order: ByteOrder::BigEndian,
-//             data: DataSet::inline(UnstructuredGridPiece {
-//                 points: None,
-//                 cells: None,
-//                 data: None,
-//             }),
-//         };
-
-//         model.export(filename).unwrap();
-//     }
-// }
 
 // JSON input and output
 pub trait JSON {
@@ -68,7 +31,6 @@ pub trait JSON {
     fn write_json(&self, filename: String) -> Result<(), std::io::Error>
         where Self: Serialize
     {
-
         let filepath = Path::new(&filename);
         let file = File::create(filepath)?;
         let writer = BufWriter::new(file);

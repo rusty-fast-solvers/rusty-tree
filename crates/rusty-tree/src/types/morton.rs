@@ -2,6 +2,10 @@
 
 use itertools::izip;
 
+
+
+use std::iter::FromIterator;
+use std::path::PathBuf;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -15,6 +19,7 @@ use mpi::{
 
 use serde::{Serialize, Deserialize};
 use hdf5::H5Type;
+use vtkio::model::*;
 
 use crate::{
     constants::{
@@ -22,7 +27,7 @@ use crate::{
         LEVEL_SIZE, NINE_BIT_MASK, X_LOOKUP_DECODE, X_LOOKUP_ENCODE, Y_LOOKUP_DECODE,
         Y_LOOKUP_ENCODE, Z_LOOKUP_DECODE, Z_LOOKUP_ENCODE,
     },
-    data::{JSON, HDF5},
+    data::{JSON, HDF5, VTK},
     types::{domain::Domain, point::PointType},
 };
 
@@ -396,6 +401,98 @@ impl HDF5<MortonKey> for Vec<MortonKey> {
         let keys: Vec<MortonKey> = keys.read_raw::<MortonKey>()?;
 
         Ok(keys)
+    }
+}
+
+pub fn serialize_box_from_key(key: MortonKey, domain: &Domain) -> Vec<f64> {
+    let anchor = key.anchor;
+
+    let mut serialized = Vec::<PointType>::with_capacity(24);
+
+    let disp = 1 << (LEVEL_DISPLACEMENT + 1 - key.level() as usize);
+
+    let anchors = [
+        [anchor[0], anchor[1], anchor[2]],
+        [disp + anchor[0], anchor[1], anchor[2]],
+        [anchor[0], disp + anchor[1], anchor[2]],
+        [disp + anchor[0], disp + anchor[1], anchor[2]],
+        [anchor[0], anchor[1], disp + anchor[2]],
+        [disp + anchor[0], anchor[1], disp + anchor[2]],
+        [anchor[0], disp + anchor[1], disp + anchor[2]],
+        [disp + anchor[0], disp + anchor[1], disp + anchor[2]],
+    ];
+
+    for anchor in anchors.iter() {
+        let coords = MortonKey::from_anchor(anchor).to_coordinates(domain);
+        for index in 0..3 {
+            serialized.push(coords[index]);
+        }
+    }
+
+    serialized
+}
+
+impl VTK for Vec<MortonKey> {
+    fn write_vtk(&self, filename: String, domain: &Domain){
+
+        let num_keys = self.len();
+
+        // We use a vtk voxel type, which has
+        // 8 points per cell, i.e. 24 float numbers
+        // per cell.
+        let num_floats = 3 * 8 * num_keys;
+        let mut cell_points = Vec::<f64>::with_capacity(num_floats);
+
+        for &key in self {
+            let serialized = serialize_box_from_key(key, domain);
+            cell_points.extend(serialized);
+        }
+
+        let num_points = 8 * (num_keys as u64); // + (num_particles as u64);
+
+        let connectivity = Vec::<u64>::from_iter(0..num_points);
+        let mut offsets = Vec::<u64>::from_iter((0..(num_keys as u64)).map(|item| 8 * item + 8));
+        offsets.push(num_points);
+
+        let mut types = vec![CellType::Voxel; num_keys];
+        types.push(CellType::PolyVertex);
+
+        let mut cell_data = Vec::<i32>::with_capacity(num_points as usize);
+
+        for _ in 0..num_keys {
+            cell_data.push(0);
+        }
+        cell_data.push(1);
+
+        let model = Vtk {
+            version: Version { major: 1, minor: 0 },
+            title: String::new(),
+            byte_order: ByteOrder::BigEndian,
+            file_path: Some(PathBuf::from(&filename)),
+            data: DataSet::inline(UnstructuredGridPiece {
+                points: IOBuffer::F64(cell_points),
+                cells: Cells {
+                    cell_verts: VertexNumbers::XML {
+                        connectivity: connectivity,
+                        offsets: offsets,
+                    },
+                    types: types,
+                },
+                data: Attributes {
+                    point: vec![],
+                    cell: vec![Attribute::DataArray(DataArrayBase {
+                        name: String::from("colors"),
+                        elem: ElementType::Scalars {
+                            num_comp: 1,
+                            lookup_table: None,
+                        },
+                        data: IOBuffer::I32(cell_data),
+                    })],
+                },
+            }),
+        };
+
+        model.export_ascii(filename).unwrap();
     }
 }
 

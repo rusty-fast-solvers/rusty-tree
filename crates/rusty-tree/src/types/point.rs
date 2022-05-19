@@ -11,9 +11,10 @@ use mpi::{
 };
 use serde::{Serialize, Deserialize};
 use hdf5::H5Type;
+use vtkio::{Vtk};
 
 use crate::{
-    data::{JSON, HDF5},
+    data::{JSON, HDF5, VTK},
     types::morton::{KeyType, MortonKey}
 };
 
@@ -114,3 +115,75 @@ impl HDF5<Point> for Vec<Point> {
         Ok(points)
     }
 }
+
+
+pub fn serialize_point(key: MortonKey, domain: &Domain) -> Vec<f64> {
+    let anchor = key.anchor;
+
+    let mut serialized = Vec::<PointType>::with_capacity(3);
+
+            serialized.push(coords[index]);
+
+    serialized
+}
+
+impl VTK for Vec<Point> {
+    fn write_vtk(&self, filename: String, domain: &Domain){
+
+        let n_pts = self.len();
+
+        let num_floats = 3 * n_pts;
+        let mut cell_points = Vec::<f64>::with_capacity(num_floats);
+
+        for &point in self {
+            cell_points.extend(point.coordinate.clone());
+        }
+
+        let n_vtk_pts = 8 * (num_keys as u64); // + (num_particles as u64);
+
+        let connectivity = Vec::<u64>::from_iter(0..n_vtk_pts);
+        let mut offsets = Vec::<u64>::from_iter((0..(num_keys as u64)).map(|item| 8 * item + 8));
+        offsets.push(n_vtk_pts);
+
+        let mut types = vec![CellType::Voxel; num_keys];
+        types.push(CellType::PolyVertex);
+
+        let mut cell_data = Vec::<i32>::with_capacity(n_vtk_pts as usize);
+
+        for _ in 0..num_keys {
+            cell_data.push(0);
+        }
+        cell_data.push(1);
+
+        let model = Vtk {
+            version: Version { major: 1, minor: 0 },
+            title: String::new(),
+            byte_order: ByteOrder::BigEndian,
+            file_path: Some(PathBuf::from(&filename)),
+            data: DataSet::inline(UnstructuredGridPiece {
+                points: IOBuffer::F64(cell_points),
+                cells: Cells {
+                    cell_verts: VertexNumbers::XML {
+                        connectivity: connectivity,
+                        offsets: offsets,
+                    },
+                    types: types,
+                },
+                data: Attributes {
+                    point: vec![],
+                    cell: vec![Attribute::DataArray(DataArrayBase {
+                        name: String::from("colors"),
+                        elem: ElementType::Scalars {
+                            num_comp: 1,
+                            lookup_table: None,
+                        },
+                        data: IOBuffer::I32(cell_data),
+                    })],
+                },
+            }),
+        };
+
+        model.export_ascii(filename).unwrap();
+    }
+}
+
