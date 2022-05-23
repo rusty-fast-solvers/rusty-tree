@@ -102,7 +102,7 @@ class DistributedTree:
 
     def write_vtk(self, filename, balanced):
         """
-        Export selected leaves to VTK file for visualization. Saved in current
+        Export leaves to VTK file for visualization. Saved in current
         working directory. Select either balanced or unbalanced leaves.
 
         Parameters
@@ -121,7 +121,7 @@ class DistributedTree:
 
     def write_hdf5(self, filename):
         """
-        Save tree in HDF5 format.
+        Serialize tree in HDF5 format.
 
         Parameters
         ----------
@@ -129,9 +129,6 @@ class DistributedTree:
         """
         pass
 
-    @staticmethod
-    def read_json(filename):
-        pass
 
     def write_json(self, filename):
         """
@@ -142,7 +139,41 @@ class DistributedTree:
         filename: str
         """
         pass
+    
+    @classmethod
+    def read_hdf5(cls, filepath, comm):
+        """
+        Instantiate a tree from tree data serialized with HDF5 on the master node, 
+        and distribute over processes in provided communicator.
 
-    @staticmethod
-    def read_json(filename):
-        pass
+        Parameters
+        ----------
+        filepath: Path
+            Posix compliant path.
+        comm: mpi4py.MPI.Intracomm
+            MPI world communicator, created using mpi4py.
+
+        Returns
+        -------
+        DistributedTree
+        """
+        return cls.from_global_points(points, balanced, comm)
+
+    @classmethod
+    def read_json(cls, filepath, comm):
+        """
+        Instantiate a tree from tree data serialized with JSON on the master node, 
+        and distribute over processes in provided communicator.
+        
+        Parameters
+        ----------
+        filepath: Path
+            Posix compliant path.
+        comm: mpi4py.MPI.Intracomm
+            MPI world communicator, created using mpi4py.
+
+        Returns
+        -------
+        DistributedTree
+        """
+        return cls.from_global_points(points, balanced, comm)

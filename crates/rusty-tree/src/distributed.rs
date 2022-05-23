@@ -4,9 +4,9 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 
 use mpi::{
-    Count,
     topology::{Rank, UserCommunicator},
     traits::*,
+    Count,
 };
 
 use hyksort::hyksort::hyksort;
@@ -471,11 +471,7 @@ impl DistributedTree {
     }
 
     /// Save a distributed tree to a hdf5 file.
-    pub fn write_hdf5(
-        world: &UserCommunicator,
-        filename: String,
-        tree: DistributedTree,
-    ) {
+    pub fn write_hdf5(world: &UserCommunicator, filename: String, tree: DistributedTree) {
         // Communicate global data to root process
         let comm = world.duplicate();
         let rank = comm.rank();
@@ -485,42 +481,99 @@ impl DistributedTree {
         let root_process = comm.process_at_rank(root_rank);
 
         // Gather the keys
-        // let local_keys = tree.keys;
+        let local_keys = tree.keys;
+        let local_points = tree.points;
+        let local_raw_points: Vec<[PointType; 3]> =
+            local_points.iter().map(|p| p.coordinate).collect();
+
         let nlocal_keys: u64 = tree.keys.len() as u64;
+        let nlocal_points: u64 = tree.points.len() as u64;
 
         let mut global_key_counts: Vec<Count> = vec![0; size as usize];
+        let mut global_point_counts: Vec<Count> = vec![0; size as usize];
+
         if rank == root_rank {
             root_process.gather_into_root(&nlocal_keys, &mut global_key_counts[..]);
+            root_process.gather_into_root(&nlocal_points, &mut global_point_counts[..]);
         } else {
             root_process.gather_into(&nlocal_keys);
+            root_process.gather_into(&nlocal_points);
         }
 
-        
-
         // Write to file on root process
-        let global_keys: Vec<MortonKey> = Vec::new();
-        let global_points: Vec<Point> = Vec::new();
-        let global_domain: Domain = Domain {
-            origin: [0., 0., 0.],
-            diameter: [0., 0., 0.],
-        };
+        if rank == root_rank {
+            // Calculate point and key displacements
+            let global_key_displs: Vec<Count> = global_key_counts
+                .iter()
+                .scan(0, |acc, &x| {
+                    let tmp = *acc;
+                    *acc += x;
+                    Some(tmp)
+                })
+                .collect();
 
-        let file = hdf5::File::create(filename).unwrap();
+            let global_point_displs: Vec<Count> = global_point_counts
+                .iter()
+                .scan(0, |acc, &x| {
+                    let tmp = *acc;
+                    *acc += x;
+                    Some(tmp)
+                })
+                .collect();
 
-        let keys = file.new_dataset::<MortonKey>().create("keys").unwrap();
-        keys.write(&global_keys);
+            // Buffer for global keys
+            let global_key_count: usize = global_key_counts.iter().sum::<Count>() as usize;
+            let global_keys: Vec<MortonKey> = vec![MortonKey::default(); global_key_count as usize];
 
-        let points = file.new_dataset::<Point>().create("points").unwrap();
-        points.write(&global_points);
+            {
+                let mut partition = PartitionMut::new(
+                    &mut global_keys[..],
+                    global_key_counts,
+                    &global_key_displs[..],
+                );
+                root_process.gather_varcount_into_root(&local_keys[..], &mut partition);
+            }
 
-        let attr_builder = file.new_attr::<bool>();
-        let attr = attr_builder.create("balanced").unwrap();
-        attr.write_scalar(&tree.balanced);
+            // Buffer for global points
+            let global_point_count: usize = global_point_counts.iter().sum::<Count>() as usize;
+            let global_points: Vec<MortonKey> =
+                vec![MortonKey::default(); global_key_count as usize];
 
-        let domain = file.create_group("domain").unwrap();
-        let origin = domain.new_dataset::<Point>().create("origin").unwrap();
-        let diameter = domain.new_dataset::<Point>().create("diameter").unwrap();
-        origin.write(&global_domain.origin);
-        diameter.write(&global_domain.diameter);
+            {
+                let mut partition = PartitionMut::new(
+                    &mut global_points[..],
+                    global_point_counts,
+                    &global_point_displs[..],
+                );
+                root_process.gather_varcount_into_root(&local_points[..], &mut partition);
+            }
+
+            // Calculate global domain
+            let comm = world.duplicate();
+            let global_domain: Domain = Domain::from_global_points(&local_raw_points[..], &comm);
+
+            // Open file buffer
+            let file = hdf5::File::create(filename).unwrap();
+
+            // Write keys
+            let keys = file.new_dataset::<MortonKey>().create("keys").unwrap();
+            keys.write(&global_keys);
+
+            // Write points
+            let points = file.new_dataset::<Point>().create("points").unwrap();
+            points.write(&global_points);
+
+            // Write balance information as an attribute
+            let attr_builder = file.new_attr::<bool>();
+            let attr = attr_builder.create("balanced").unwrap();
+            attr.write_scalar(&tree.balanced);
+
+            // Write domain
+            let domain = file.create_group("domain").unwrap();
+            let origin = domain.new_dataset::<Point>().create("origin").unwrap();
+            let diameter = domain.new_dataset::<Point>().create("diameter").unwrap();
+            origin.write(&global_domain.origin);
+            diameter.write(&global_domain.diameter);
+        }
     }
 }
