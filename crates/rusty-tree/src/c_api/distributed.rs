@@ -58,28 +58,52 @@ pub extern "C" fn distributed_tree_balanced(p_tree: *const DistributedTree) -> b
 }
 
 #[no_mangle]
-pub extern "C" fn distributed_tree_to_vtk(
+pub extern "C" fn distributed_tree_write_vtk(
+    comm: *mut usize,
     p_tree: *const DistributedTree,
     p_filename: *mut c_char,
-    p_origin: *const [PointType; 3],
-    p_diameter: *const [PointType; 3],
 ) {
-    let origin = unsafe { std::slice::from_raw_parts(p_origin, 1) }[0];
-    let diameter = unsafe { std::slice::from_raw_parts(p_diameter, 1) }[0];
     let filename = unsafe { CString::from_raw(p_filename).to_str().unwrap().to_string() };
     let tree = unsafe { &*p_tree };
-    let domain = Domain { origin, diameter };
+    let raw_points: Vec<[PointType; 3]> = tree.points.iter().map(|p| p.coordinate).collect();
+    
+    let comm = std::mem::ManuallyDrop::new(unsafe {
+        UserCommunicator::from_raw(*(comm as *const MPI_Comm)).unwrap()
+    });
+
+    let domain = Domain::from_global_points(&raw_points[..], &comm);
     tree.keys.write_vtk(filename, &domain);
 }
 
+
 #[no_mangle]
-pub extern "C" fn distributed_tree_to_hdf5(
+pub extern "C" fn distributed_tree_write_hdf5(
+    comm: *mut usize,
     p_tree: *const DistributedTree,
     p_filename: *mut c_char,
-    balanced: bool,
 ) {
     let filename = unsafe { CString::from_raw(p_filename).to_str().unwrap().to_string() };
     let tree = unsafe { &*p_tree };
+    
+    let comm = std::mem::ManuallyDrop::new(unsafe {
+        UserCommunicator::from_raw(*(comm as *const MPI_Comm)).unwrap()
+    });
 
-    &tree.keys;
+    DistributedTree::write_hdf5(&comm, filename, tree);
+}
+
+#[no_mangle]
+pub extern "C" fn distributed_tree_read_hdf5(
+    world: *mut usize,
+    p_filepath: *mut c_char
+) -> *mut DistributedTree{
+
+    let filepath = unsafe { CString::from_raw(p_filepath).to_str().unwrap().to_string() };
+    let world = std::mem::ManuallyDrop::new(unsafe {
+        UserCommunicator::from_raw(*(world as *const MPI_Comm)).unwrap()
+    });
+
+    Box::into_raw(Box::new(
+        DistributedTree::read_hdf5(&world, filepath)
+    ))
 }

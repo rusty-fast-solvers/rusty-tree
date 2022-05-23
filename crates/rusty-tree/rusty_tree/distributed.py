@@ -109,7 +109,12 @@ class DistributedTree:
         ----------
         filename: str
         """
-        lib.distributed_tree_to_vtk(filename_data)
+        comm = self.comm.duplicate()
+        p_comm = MPI._addressof(comm)
+        raw_comm = ffi.cast("uintptr_t*", p_comm)
+        filename_data = ffi.cast("char[]*", filename)
+
+        lib.distributed_tree_write_vtk(raw_comm, self.ctype, filename_data)
 
     def write_hdf5(self, filename):
         """
@@ -119,10 +124,15 @@ class DistributedTree:
         ----------
         filename: str
         """
-        lib.distributed_tree_write_hdf5(filename_data)
+        comm = self.comm.duplicate()
+        p_comm = MPI._addressof(comm)
+        raw_comm = ffi.cast("uintptr_t*", p_comm)
+        filename_data = ffi.cast("char[]*", filename)
+
+        lib.distributed_tree_write_hdf5(raw_comm, self.ctype, filename_data)
     
     @classmethod
-    def read_hdf5(cls, filepath, comm):
+    def read_hdf5(cls, filepath):
         """
         Instantiate a tree from tree data serialized with HDF5 on the master node, 
         and distribute over processes in provided communicator.
@@ -131,11 +141,16 @@ class DistributedTree:
         ----------
         filepath: Path
             Posix compliant path.
-        comm: mpi4py.MPI.Intracomm
-            MPI world communicator, created using mpi4py.
-
+        
         Returns
         -------
         DistributedTree
         """
-        return cls.from_global_points(points, balanced, comm)
+
+        filepath_str = str(filepath.resolve(strict=True))
+        filepath_data = ffi.cast("char[]*", filename)
+        comm = self.comm.duplicate()
+        p_comm = MPI._addressof(comm)
+        raw_comm = ffi.cast("uintptr_t*", p_comm)
+
+        return lib.distributed_tree_read_hdf5(raw_comm, filepath_data)

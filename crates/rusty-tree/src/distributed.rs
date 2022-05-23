@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 
 use mpi::{
+    datatype::{Partition, PartitionMut},
     topology::{Rank, UserCommunicator},
     traits::*,
     Count,
@@ -433,45 +434,126 @@ impl DistributedTree {
 
     /// Read a tree from a from a HDF5 file, and redistribute over nodes.
     pub fn read_hdf5(world: &UserCommunicator, filepath: String) -> DistributedTree {
-        let file = hdf5::File::create(&filepath).unwrap();
+        
+        let comm = world.duplicate();
+        let rank = comm.rank();
+        let size = comm.size();
 
-        let keys = Vec::<MortonKey>::read_hdf5(&filepath).unwrap();
-        let points = Vec::<Point>::read_hdf5(&filepath).unwrap();
-        let balanced: bool = file.attr("balanced").unwrap().read_scalar().unwrap();
-        let domain = file.group("domain").unwrap();
+        let root_rank = 0;
+        let root_process = comm.process_at_rank(root_rank);
 
-        let origin: [PointType; 3] = domain
-            .dataset("origin")
-            .unwrap()
-            .read_raw::<PointType>()
-            .unwrap()[0..3]
-            .try_into()
-            .unwrap();
+        // Communicate point and key sizes
+        let mut nlocal_keys = 0 as Count;
+        let mut nlocal_points = 0 as Count;
 
-        let diameter: [PointType; 3] = domain
-            .dataset("diameter")
-            .unwrap()
-            .read_raw::<PointType>()
-            .unwrap()[0..3]
-            .try_into()
-            .unwrap();
+        if rank == root_rank {
+            let file = hdf5::File::create(&filepath).unwrap();
+            
+            let experiment_size: Rank = file.attr("comm_size").unwrap().read_scalar().unwrap();
 
-        let domain = Domain { origin, diameter };
+            // Communicator sizes have to match to replicate tree 
+            if experiment_size != size {
+                comm.abort(1);
+            } else {
+                let global_key_counts: Vec<Count> = file.dataset("key_counts").unwrap().read_raw::<Count>().unwrap();
+                let global_point_counts: Vec<Count> = file.dataset("point_counts").unwrap().read_raw::<Count>().unwrap();
+                root_process.scatter_into_root(&global_key_counts, &mut nlocal_keys);            
+                root_process.scatter_into_root(&global_point_counts, &mut nlocal_points);            
+            }
+        } else {
+            root_process.scatter_into(&mut nlocal_keys);
+            root_process.scatter_into(&mut nlocal_points);
+        }
 
+        // Communicate data
+        let mut local_keys: Vec<MortonKey> = vec![MortonKey::default(); nlocal_keys as usize];
+        let mut local_points: Vec<Point> = vec![Point::default(); nlocal_points as usize];
+
+        let mut balanced = false;
+        let mut global_domain = Domain::default();
+
+        if rank == root_rank {
+            let file = hdf5::File::create(&filepath).unwrap();
+            let experiment_size: Rank = file.attr("comm_size").unwrap().read_scalar().unwrap();
+
+            // Read global data into master process
+            let balanced: bool = file.attr("balanced").unwrap().read_scalar().unwrap();
+
+            // Communicator sizes have to match to replicate tree 
+            if experiment_size != size {
+                comm.abort(1);
+            } else {
+                
+                let global_keys: Vec<MortonKey> = file.dataset("keys").unwrap().read_raw::<MortonKey>().unwrap(); 
+                let global_key_counts: Vec<Count> = file.dataset("key_counts").unwrap().read_raw::<Count>().unwrap();
+                let global_key_displs: Vec<Count> = file.dataset("key_displs").unwrap().read_raw::<Count>().unwrap();
+
+                let global_points: Vec<Point> = file.dataset("points").unwrap().read_raw::<Point>().unwrap(); 
+                let global_point_counts: Vec<Count> = file.dataset("point_counts").unwrap().read_raw::<Count>().unwrap();
+                let global_point_displs: Vec<Count> = file.dataset("point_displs").unwrap().read_raw::<Count>().unwrap();
+                
+                let global_domain = file.group("domain").unwrap();
+
+                let origin: [PointType; 3] = global_domain
+                    .dataset("origin")
+                    .unwrap()
+                    .read_raw::<PointType>()
+                    .unwrap()[0..3]
+                    .try_into()
+                    .unwrap();
+
+                let diameter: [PointType; 3] = global_domain
+                    .dataset("diameter")
+                    .unwrap()
+                    .read_raw::<PointType>()
+                    .unwrap()[0..3]
+                    .try_into()
+                    .unwrap();
+
+                let global_domain = Domain { origin, diameter };
+
+                // Distribute tree data to processes in communicator
+                let mut key_partition = Partition::new(
+                    &global_keys[..],
+                    global_key_counts,
+                    &global_key_displs[..],
+                );
+                
+                let mut point_partition = Partition::new(
+                    &global_points[..],
+                    global_point_counts,
+                    &global_point_displs[..],
+                );
+
+                root_process.scatter_varcount_into_root(&key_partition, &mut local_keys[..]);
+                root_process.scatter_varcount_into_root(&point_partition, &mut local_points[..]);
+            }
+        } else { 
+            root_process.scatter_varcount_into(&mut local_keys[..]);
+            root_process.scatter_varcount_into(&mut local_points[..]);
+        }
+
+        // Broadcast balance information
+        root_process.broadcast_into(&mut balanced);
+        
+        // Broadcast domain
+        root_process.broadcast_into(&mut global_domain);
+            
+        // Generate a local instance of distributed tree
         let points_to_keys =
-            DistributedTree::assign_nodes_to_leaves(&points.iter().map(|p| p.key).collect(), &keys);
+            DistributedTree::assign_nodes_to_leaves(&local_points.iter().map(|p| p.key).collect(), &local_keys);
 
         DistributedTree {
-            keys,
-            points,
-            points_to_keys,
-            balanced,
-            domain,
+            keys: local_keys,
+            points: local_points,
+            points_to_keys: points_to_keys,
+            balanced: balanced,
+            domain: global_domain,
         }
     }
 
     /// Save a distributed tree to a hdf5 file.
-    pub fn write_hdf5(world: &UserCommunicator, filename: String, tree: DistributedTree) {
+    pub fn write_hdf5(world: &UserCommunicator, filename: String, tree: &DistributedTree) {
         // Communicate global data to root process
         let comm = world.duplicate();
         let rank = comm.rank();
@@ -481,8 +563,8 @@ impl DistributedTree {
         let root_process = comm.process_at_rank(root_rank);
 
         // Gather the keys
-        let local_keys = tree.keys;
-        let local_points = tree.points;
+        let local_keys = &tree.keys;
+        let local_points = &tree.points;
         let local_raw_points: Vec<[PointType; 3]> =
             local_points.iter().map(|p| p.coordinate).collect();
 
@@ -523,30 +605,26 @@ impl DistributedTree {
 
             // Buffer for global keys
             let global_key_count: usize = global_key_counts.iter().sum::<Count>() as usize;
-            let global_keys: Vec<MortonKey> = vec![MortonKey::default(); global_key_count as usize];
+            let mut global_keys: Vec<MortonKey> = vec![MortonKey::default(); global_key_count as usize];
 
-            {
-                let mut partition = PartitionMut::new(
-                    &mut global_keys[..],
-                    global_key_counts,
-                    &global_key_displs[..],
-                );
-                root_process.gather_varcount_into_root(&local_keys[..], &mut partition);
-            }
+            let mut key_partition = PartitionMut::new(
+                &mut global_keys[..],
+                global_key_counts.clone(),
+                &global_key_displs[..],
+            );
+            root_process.gather_varcount_into_root(&local_keys[..], &mut key_partition);
 
             // Buffer for global points
             let global_point_count: usize = global_point_counts.iter().sum::<Count>() as usize;
-            let global_points: Vec<MortonKey> =
-                vec![MortonKey::default(); global_key_count as usize];
+            let mut global_points: Vec<Point> =
+                vec![Point::default(); global_point_count as usize];
 
-            {
-                let mut partition = PartitionMut::new(
-                    &mut global_points[..],
-                    global_point_counts,
-                    &global_point_displs[..],
-                );
-                root_process.gather_varcount_into_root(&local_points[..], &mut partition);
-            }
+            let mut point_partition = PartitionMut::new(
+                &mut global_points[..],
+                global_point_counts.clone(),
+                &global_point_displs[..],
+            );
+            root_process.gather_varcount_into_root(&local_points[..], &mut point_partition);
 
             // Calculate global domain
             let comm = world.duplicate();
@@ -567,6 +645,25 @@ impl DistributedTree {
             let attr_builder = file.new_attr::<bool>();
             let attr = attr_builder.create("balanced").unwrap();
             attr.write_scalar(&tree.balanced);
+
+            // Write world size as an attribute
+            let attr_builder = file.new_attr::<i32>();
+            let attr = attr_builder.create("comm_size").unwrap();
+            attr.write_scalar(&size);
+
+            // Write key partition
+            let key_counts = file.new_dataset::<Count>().create("key_counts").unwrap();
+            key_counts.write(&global_key_counts);
+
+            let key_displs = file.new_dataset::<Count>().create("key_displs").unwrap();
+            key_displs.write(&global_key_displs);
+
+            // Write point partition
+            let point_counts = file.new_dataset::<Count>().create("point_counts").unwrap();
+            point_counts.write(&global_point_counts);
+
+            let point_displs = file.new_dataset::<Count>().create("point_displs").unwrap();
+            point_displs.write(&global_point_displs);
 
             // Write domain
             let domain = file.create_group("domain").unwrap();
