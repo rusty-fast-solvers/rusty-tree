@@ -469,21 +469,20 @@ impl DistributedTree {
         let mut local_keys: Vec<MortonKey> = vec![MortonKey::default(); nlocal_keys as usize];
         let mut local_points: Vec<Point> = vec![Point::default(); nlocal_points as usize];
 
-        let mut balanced = false;
+        // Placeholders for global values
+        let mut balanced = bool::default();
         let mut global_domain = Domain::default();
 
         if rank == root_rank {
             let file = hdf5::File::create(&filepath).unwrap();
             let experiment_size: Rank = file.attr("comm_size").unwrap().read_scalar().unwrap();
 
-            // Read global data into master process
-            let balanced: bool = file.attr("balanced").unwrap().read_scalar().unwrap();
-
             // Communicator sizes have to match to replicate tree 
             if experiment_size != size {
                 comm.abort(1);
             } else {
-                
+            
+                // Read global data into master process
                 let global_keys: Vec<MortonKey> = file.dataset("keys").unwrap().read_raw::<MortonKey>().unwrap(); 
                 let global_key_counts: Vec<Count> = file.dataset("key_counts").unwrap().read_raw::<Count>().unwrap();
                 let global_key_displs: Vec<Count> = file.dataset("key_displs").unwrap().read_raw::<Count>().unwrap();
@@ -492,17 +491,15 @@ impl DistributedTree {
                 let global_point_counts: Vec<Count> = file.dataset("point_counts").unwrap().read_raw::<Count>().unwrap();
                 let global_point_displs: Vec<Count> = file.dataset("point_displs").unwrap().read_raw::<Count>().unwrap();
                 
-                let global_domain = file.group("domain").unwrap();
-
-                let origin: [PointType; 3] = global_domain
+                let domain = file.group("domain").unwrap();
+                let origin: [PointType; 3] = domain
                     .dataset("origin")
                     .unwrap()
                     .read_raw::<PointType>()
                     .unwrap()[0..3]
                     .try_into()
                     .unwrap();
-
-                let diameter: [PointType; 3] = global_domain
+                let diameter: [PointType; 3] = domain
                     .dataset("diameter")
                     .unwrap()
                     .read_raw::<PointType>()
@@ -510,16 +507,17 @@ impl DistributedTree {
                     .try_into()
                     .unwrap();
 
-                let global_domain = Domain { origin, diameter };
+                global_domain = Domain { origin, diameter };
+                balanced = file.attr("balanced").unwrap().read_scalar().unwrap();                   
 
                 // Distribute tree data to processes in communicator
-                let mut key_partition = Partition::new(
+                let key_partition = Partition::new(
                     &global_keys[..],
                     global_key_counts,
                     &global_key_displs[..],
                 );
                 
-                let mut point_partition = Partition::new(
+                let point_partition = Partition::new(
                     &global_points[..],
                     global_point_counts,
                     &global_point_displs[..],
