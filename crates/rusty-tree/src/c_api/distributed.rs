@@ -66,7 +66,7 @@ pub extern "C" fn distributed_tree_write_vtk(
     let filename = unsafe { CString::from_raw(p_filename).to_str().unwrap().to_string() };
     let tree = unsafe { &*p_tree };
     let raw_points: Vec<[PointType; 3]> = tree.points.iter().map(|p| p.coordinate).collect();
-    
+
     let comm = std::mem::ManuallyDrop::new(unsafe {
         UserCommunicator::from_raw(*(comm as *const MPI_Comm)).unwrap()
     });
@@ -74,7 +74,6 @@ pub extern "C" fn distributed_tree_write_vtk(
     let domain = Domain::from_global_points(&raw_points[..], &comm);
     tree.keys.write_vtk(filename, &domain);
 }
-
 
 #[no_mangle]
 pub extern "C" fn distributed_tree_write_hdf5(
@@ -84,7 +83,7 @@ pub extern "C" fn distributed_tree_write_hdf5(
 ) {
     let filename = unsafe { CString::from_raw(p_filename).to_str().unwrap().to_string() };
     let tree = unsafe { &*p_tree };
-    
+
     let comm = std::mem::ManuallyDrop::new(unsafe {
         UserCommunicator::from_raw(*(comm as *const MPI_Comm)).unwrap()
     });
@@ -95,15 +94,12 @@ pub extern "C" fn distributed_tree_write_hdf5(
 #[no_mangle]
 pub extern "C" fn distributed_tree_read_hdf5(
     world: *mut usize,
-    p_filepath: *mut c_char
-) -> *mut DistributedTree{
-
+    p_filepath: *mut c_char,
+) -> *mut DistributedTree {
     let filepath = unsafe { CString::from_raw(p_filepath).to_str().unwrap().to_string() };
     let world = std::mem::ManuallyDrop::new(unsafe {
         UserCommunicator::from_raw(*(world as *const MPI_Comm)).unwrap()
     });
 
-    Box::into_raw(Box::new(
-        DistributedTree::read_hdf5(&world, filepath)
-    ))
+    Box::into_raw(Box::new(DistributedTree::read_hdf5(&world, filepath)))
 }

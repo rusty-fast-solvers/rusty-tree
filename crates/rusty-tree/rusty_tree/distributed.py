@@ -130,18 +130,18 @@ class DistributedTree:
         filename_data = ffi.cast("char[]*", filename)
 
         lib.distributed_tree_write_hdf5(raw_comm, self.ctype, filename_data)
-    
+
     @classmethod
     def read_hdf5(cls, filepath):
         """
-        Instantiate a tree from tree data serialized with HDF5 on the master node, 
+        Instantiate a tree from tree data serialized with HDF5 on the master node,
         and distribute over processes in provided communicator.
 
         Parameters
         ----------
         filepath: Path
             Posix compliant path.
-        
+
         Returns
         -------
         DistributedTree

@@ -434,7 +434,6 @@ impl DistributedTree {
 
     /// Read a tree from a from a HDF5 file, and redistribute over nodes.
     pub fn read_hdf5(world: &UserCommunicator, filepath: String) -> DistributedTree {
-        
         let comm = world.duplicate();
         let rank = comm.rank();
         let size = comm.size();
@@ -448,17 +447,25 @@ impl DistributedTree {
 
         if rank == root_rank {
             let file = hdf5::File::create(&filepath).unwrap();
-            
+
             let experiment_size: Rank = file.attr("comm_size").unwrap().read_scalar().unwrap();
 
-            // Communicator sizes have to match to replicate tree 
+            // Communicator sizes have to match to replicate tree
             if experiment_size != size {
                 comm.abort(1);
             } else {
-                let global_key_counts: Vec<Count> = file.dataset("key_counts").unwrap().read_raw::<Count>().unwrap();
-                let global_point_counts: Vec<Count> = file.dataset("point_counts").unwrap().read_raw::<Count>().unwrap();
-                root_process.scatter_into_root(&global_key_counts, &mut nlocal_keys);            
-                root_process.scatter_into_root(&global_point_counts, &mut nlocal_points);            
+                let global_key_counts: Vec<Count> = file
+                    .dataset("key_counts")
+                    .unwrap()
+                    .read_raw::<Count>()
+                    .unwrap();
+                let global_point_counts: Vec<Count> = file
+                    .dataset("point_counts")
+                    .unwrap()
+                    .read_raw::<Count>()
+                    .unwrap();
+                root_process.scatter_into_root(&global_key_counts, &mut nlocal_keys);
+                root_process.scatter_into_root(&global_point_counts, &mut nlocal_points);
             }
         } else {
             root_process.scatter_into(&mut nlocal_keys);
@@ -477,20 +484,40 @@ impl DistributedTree {
             let file = hdf5::File::create(&filepath).unwrap();
             let experiment_size: Rank = file.attr("comm_size").unwrap().read_scalar().unwrap();
 
-            // Communicator sizes have to match to replicate tree 
+            // Communicator sizes have to match to replicate tree
             if experiment_size != size {
                 comm.abort(1);
             } else {
-            
                 // Read global data into master process
-                let global_keys: Vec<MortonKey> = file.dataset("keys").unwrap().read_raw::<MortonKey>().unwrap(); 
-                let global_key_counts: Vec<Count> = file.dataset("key_counts").unwrap().read_raw::<Count>().unwrap();
-                let global_key_displs: Vec<Count> = file.dataset("key_displs").unwrap().read_raw::<Count>().unwrap();
+                let global_keys: Vec<MortonKey> = file
+                    .dataset("keys")
+                    .unwrap()
+                    .read_raw::<MortonKey>()
+                    .unwrap();
+                let global_key_counts: Vec<Count> = file
+                    .dataset("key_counts")
+                    .unwrap()
+                    .read_raw::<Count>()
+                    .unwrap();
+                let global_key_displs: Vec<Count> = file
+                    .dataset("key_displs")
+                    .unwrap()
+                    .read_raw::<Count>()
+                    .unwrap();
 
-                let global_points: Vec<Point> = file.dataset("points").unwrap().read_raw::<Point>().unwrap(); 
-                let global_point_counts: Vec<Count> = file.dataset("point_counts").unwrap().read_raw::<Count>().unwrap();
-                let global_point_displs: Vec<Count> = file.dataset("point_displs").unwrap().read_raw::<Count>().unwrap();
-                
+                let global_points: Vec<Point> =
+                    file.dataset("points").unwrap().read_raw::<Point>().unwrap();
+                let global_point_counts: Vec<Count> = file
+                    .dataset("point_counts")
+                    .unwrap()
+                    .read_raw::<Count>()
+                    .unwrap();
+                let global_point_displs: Vec<Count> = file
+                    .dataset("point_displs")
+                    .unwrap()
+                    .read_raw::<Count>()
+                    .unwrap();
+
                 let domain = file.group("domain").unwrap();
                 let origin: [PointType; 3] = domain
                     .dataset("origin")
@@ -508,15 +535,12 @@ impl DistributedTree {
                     .unwrap();
 
                 global_domain = Domain { origin, diameter };
-                balanced = file.attr("balanced").unwrap().read_scalar().unwrap();                   
+                balanced = file.attr("balanced").unwrap().read_scalar().unwrap();
 
                 // Distribute tree data to processes in communicator
-                let key_partition = Partition::new(
-                    &global_keys[..],
-                    global_key_counts,
-                    &global_key_displs[..],
-                );
-                
+                let key_partition =
+                    Partition::new(&global_keys[..], global_key_counts, &global_key_displs[..]);
+
                 let point_partition = Partition::new(
                     &global_points[..],
                     global_point_counts,
@@ -526,20 +550,22 @@ impl DistributedTree {
                 root_process.scatter_varcount_into_root(&key_partition, &mut local_keys[..]);
                 root_process.scatter_varcount_into_root(&point_partition, &mut local_points[..]);
             }
-        } else { 
+        } else {
             root_process.scatter_varcount_into(&mut local_keys[..]);
             root_process.scatter_varcount_into(&mut local_points[..]);
         }
 
         // Broadcast balance information
         root_process.broadcast_into(&mut balanced);
-        
+
         // Broadcast domain
         root_process.broadcast_into(&mut global_domain);
-            
+
         // Generate a local instance of distributed tree
-        let points_to_keys =
-            DistributedTree::assign_nodes_to_leaves(&local_points.iter().map(|p| p.key).collect(), &local_keys);
+        let points_to_keys = DistributedTree::assign_nodes_to_leaves(
+            &local_points.iter().map(|p| p.key).collect(),
+            &local_keys,
+        );
 
         DistributedTree {
             keys: local_keys,
@@ -603,7 +629,8 @@ impl DistributedTree {
 
             // Buffer for global keys
             let global_key_count: usize = global_key_counts.iter().sum::<Count>() as usize;
-            let mut global_keys: Vec<MortonKey> = vec![MortonKey::default(); global_key_count as usize];
+            let mut global_keys: Vec<MortonKey> =
+                vec![MortonKey::default(); global_key_count as usize];
 
             let mut key_partition = PartitionMut::new(
                 &mut global_keys[..],
@@ -614,8 +641,7 @@ impl DistributedTree {
 
             // Buffer for global points
             let global_point_count: usize = global_point_counts.iter().sum::<Count>() as usize;
-            let mut global_points: Vec<Point> =
-                vec![Point::default(); global_point_count as usize];
+            let mut global_points: Vec<Point> = vec![Point::default(); global_point_count as usize];
 
             let mut point_partition = PartitionMut::new(
                 &mut global_points[..],

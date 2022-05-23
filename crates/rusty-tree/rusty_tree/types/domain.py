@@ -30,7 +30,7 @@ class Domain:
     def origin(self):
         """
         Coordinate corresponding to the origin of the domain.
-        
+
         Returns
         -------
         np.array(shape=(3, 1), dtype=np.float64)
@@ -41,7 +41,7 @@ class Domain:
     def diameter(self):
         """
         Width of domain along each axis.
-        
+
         Returns
         --------
         np.array(shape=(3, 1), dtype=np.float64)
@@ -52,7 +52,7 @@ class Domain:
     def from_local_points(cls, points):
         """
         Infer the domain from points on this processor.
-        
+
         Parameters
         ----------
         points: np.array(shape=(n, 3), dtype=np.float64)

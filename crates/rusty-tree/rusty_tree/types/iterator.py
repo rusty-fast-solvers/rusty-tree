@@ -58,6 +58,7 @@ class Iterator:
     """
     Wrapper for Rust iterators exposed via a raw pointer via CFFI.
     """
+
     def __init__(self, pointer, n, iterator_protocol):
         """
         This constructor should not be used outside the class. Instead
