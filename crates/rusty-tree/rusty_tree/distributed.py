@@ -100,45 +100,26 @@ class DistributedTree:
             raw_comm,
         )
 
-    def write_vtk(self, filename, balanced):
+    def write_vtk(self, filename):
         """
         Export leaves to VTK file for visualization. Saved in current
-        working directory. Select either balanced or unbalanced leaves.
+        working directory.
 
         Parameters
         ----------
         filename: str
-        balanced: bool
         """
-        if self.balanced == True:
-            balanced_data = ffi.cast("bool", np.bool(balanced))
-        elif self.balanced == False:
-            balanced_data = ffi.cast("bool", np.bool(False))
-
-        filename_data = ffi.cast("char[]", filename)
-
-        lib.distributed_tree_to_vtk(filename_data, balanced_data)
+        lib.distributed_tree_to_vtk(filename_data)
 
     def write_hdf5(self, filename):
         """
-        Serialize tree in HDF5 format.
+        Serialize a distributed tree in HDF5 format on the master node.
 
         Parameters
         ----------
         filename: str
         """
-        pass
-
-
-    def write_json(self, filename):
-        """
-        Serialize tree in JSON format.
-
-        Parameters
-        ----------
-        filename: str
-        """
-        pass
+        lib.distributed_tree_write_hdf5(filename_data)
     
     @classmethod
     def read_hdf5(cls, filepath, comm):
@@ -146,25 +127,6 @@ class DistributedTree:
         Instantiate a tree from tree data serialized with HDF5 on the master node, 
         and distribute over processes in provided communicator.
 
-        Parameters
-        ----------
-        filepath: Path
-            Posix compliant path.
-        comm: mpi4py.MPI.Intracomm
-            MPI world communicator, created using mpi4py.
-
-        Returns
-        -------
-        DistributedTree
-        """
-        return cls.from_global_points(points, balanced, comm)
-
-    @classmethod
-    def read_json(cls, filepath, comm):
-        """
-        Instantiate a tree from tree data serialized with JSON on the master node, 
-        and distribute over processes in provided communicator.
-        
         Parameters
         ----------
         filepath: Path
