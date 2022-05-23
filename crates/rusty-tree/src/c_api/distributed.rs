@@ -1,13 +1,16 @@
 //! Wrappers for Distributed Tree interface
 use mpi::{ffi::MPI_Comm, topology::UserCommunicator, traits::*};
+use std::ffi::CString;
+use std::os::raw::c_char;
 
 use crate::{
+    data::{HDF5, JSON, VTK},
     distributed::DistributedTree,
     types::{
+        domain::Domain,
         morton::MortonKey,
         point::{Point, PointType},
     },
-    data::VTK,
 };
 
 #[no_mangle]
@@ -54,8 +57,29 @@ pub extern "C" fn distributed_tree_balanced(p_tree: *const DistributedTree) -> b
     tree.balanced
 }
 
-// #[no_mangle]
-// pub extern "C" fn distributed_tree_to_vtk(p_tree: *const DistributedTree, filename: String) {
-//     let tree = unsafe { &*p_tree };
-//     tree.keys.to_vtk(filename);
-// }
+#[no_mangle]
+pub extern "C" fn distributed_tree_to_vtk(
+    p_tree: *const DistributedTree,
+    p_filename: *mut c_char,
+    p_origin: *const [PointType; 3],
+    p_diameter: *const [PointType; 3],
+) {
+    let origin = unsafe { std::slice::from_raw_parts(p_origin, 1) }[0];
+    let diameter = unsafe { std::slice::from_raw_parts(p_diameter, 1) }[0];
+    let filename = unsafe { CString::from_raw(p_filename).to_str().unwrap().to_string() };
+    let tree = unsafe { &*p_tree };
+    let domain = Domain { origin, diameter };
+    tree.keys.write_vtk(filename, &domain);
+}
+
+#[no_mangle]
+pub extern "C" fn distributed_tree_to_hdf5(
+    p_tree: *const DistributedTree,
+    p_filename: *mut c_char,
+    balanced: bool,
+) {
+    let filename = unsafe { CString::from_raw(p_filename).to_str().unwrap().to_string() };
+    let tree = unsafe { &*p_tree };
+
+    &tree.keys;
+}

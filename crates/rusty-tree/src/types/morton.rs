@@ -2,14 +2,12 @@
 
 use itertools::izip;
 
-
-
-use std::iter::FromIterator;
-use std::path::PathBuf;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
+use std::iter::FromIterator;
 use std::path::Path;
+use std::path::PathBuf;
 
 use memoffset::offset_of;
 use mpi::{
@@ -17,8 +15,8 @@ use mpi::{
     Address,
 };
 
-use serde::{Serialize, Deserialize};
 use hdf5::H5Type;
+use serde::{Deserialize, Serialize};
 use vtkio::model::*;
 
 use crate::{
@@ -27,7 +25,7 @@ use crate::{
         LEVEL_SIZE, NINE_BIT_MASK, X_LOOKUP_DECODE, X_LOOKUP_ENCODE, Y_LOOKUP_DECODE,
         Y_LOOKUP_ENCODE, Z_LOOKUP_DECODE, Z_LOOKUP_ENCODE,
     },
-    data::{JSON, HDF5, VTK},
+    data::{HDF5, JSON, VTK},
     types::{domain::Domain, point::PointType},
 };
 
@@ -385,25 +383,22 @@ impl Hash for MortonKey {
 impl JSON for Vec<MortonKey> {}
 
 impl HDF5<MortonKey> for Vec<MortonKey> {
-    fn write_hdf5<P: AsRef<Path>>(&self, filename: P) -> hdf5::Result<()>
-    {
+    fn write_hdf5<P: AsRef<Path>>(&self, filename: P) -> hdf5::Result<()> {
         let file = hdf5::File::create(filename)?;
-        let keys = file.new_dataset::<MortonKey>().create("morton_keys")?;
+        let keys = file.new_dataset::<MortonKey>().create("keys")?;
         keys.write(self)?;
 
         Ok(())
     }
 
-    fn read_hdf5<P: AsRef<Path>>(filepath: P) -> hdf5::Result<Vec<MortonKey>>
-    {
+    fn read_hdf5<P: AsRef<Path>>(filepath: P) -> hdf5::Result<Vec<MortonKey>> {
         let file = hdf5::File::open(filepath)?;
-        let keys = file.dataset("morton_keys")?;
+        let keys = file.dataset("keys")?;
         let keys: Vec<MortonKey> = keys.read_raw::<MortonKey>()?;
 
         Ok(keys)
     }
 }
-
 
 /// Serialize a Morton Key for VTK visualization.
 fn serialize_morton_key(key: MortonKey, domain: &Domain) -> Vec<f64> {
@@ -436,10 +431,8 @@ fn serialize_morton_key(key: MortonKey, domain: &Domain) -> Vec<f64> {
 
 // VTK output.
 impl VTK for Vec<MortonKey> {
-
     // Save data to a VTK file for visualization.
-    fn write_vtk(&self, filename: String, domain: &Domain)
-    {
+    fn write_vtk(&self, filename: String, domain: &Domain) {
         let n_keys = self.len();
 
         // We use a vtk voxel type, which has
@@ -500,7 +493,6 @@ impl VTK for Vec<MortonKey> {
         model.export_ascii(filename).unwrap();
     }
 }
-
 
 /// Return the level associated with a key.
 fn find_level(morton: KeyType) -> KeyType {

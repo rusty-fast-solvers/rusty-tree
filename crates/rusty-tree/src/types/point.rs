@@ -4,20 +4,19 @@ use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 
+use hdf5::H5Type;
 use memoffset::offset_of;
 use mpi::{
     datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
     Address,
 };
-use serde::{Serialize, Deserialize};
-use hdf5::H5Type;
-use vtkio::{Vtk};
+use serde::{Deserialize, Serialize};
+use vtkio::Vtk;
 
 use crate::{
-    data::{JSON, HDF5, VTK},
-    types::morton::{KeyType, MortonKey}
+    data::{HDF5, JSON, VTK},
+    types::morton::{KeyType, MortonKey},
 };
-
 
 pub type PointType = f64;
 
@@ -33,7 +32,6 @@ pub struct Point {
 
 /// Vector of **Points**.
 pub type Points = Vec<Point>;
-
 
 unsafe impl Equivalence for Point {
     type Out = UserDatatype;
@@ -97,8 +95,7 @@ impl Hash for Point {
 impl JSON for Vec<Point> {}
 
 impl HDF5<Point> for Vec<Point> {
-    fn write_hdf5<P: AsRef<Path>>(&self, filename: P) -> hdf5::Result<()>
-    {
+    fn write_hdf5<P: AsRef<Path>>(&self, filename: P) -> hdf5::Result<()> {
         let file = hdf5::File::create(filename)?;
         let points = file.new_dataset::<Point>().create("points")?;
         points.write(self)?;
@@ -106,8 +103,7 @@ impl HDF5<Point> for Vec<Point> {
         Ok(())
     }
 
-    fn read_hdf5<P: AsRef<Path>>(filepath: P) -> hdf5::Result<Vec<Point>>
-    {
+    fn read_hdf5<P: AsRef<Path>>(filepath: P) -> hdf5::Result<Vec<Point>> {
         let file = hdf5::File::open(filepath)?;
         let points = file.dataset("points")?;
         let points: Vec<Point> = points.read_raw::<Point>()?;

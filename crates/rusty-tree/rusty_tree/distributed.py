@@ -100,13 +100,49 @@ class DistributedTree:
             raw_comm,
         )
 
-        def to_vtk(self, filename):
-            """
-            Export to VTK file for visualization. Saved in current working directory.
-            
-            Parameters
-            ----------
-            filename: str
-            """
-            c_filename = ffi.cast("char[]", filename)
-            lib.distributed_tree_to_vtk(c_filename)
+    def write_vtk(self, filename, balanced):
+        """
+        Export selected leaves to VTK file for visualization. Saved in current
+        working directory. Select either balanced or unbalanced leaves.
+
+        Parameters
+        ----------
+        filename: str
+        balanced: bool
+        """
+        if self.balanced == True:
+            balanced_data = ffi.cast("bool", np.bool(balanced))
+        elif self.balanced == False:
+            balanced_data = ffi.cast("bool", np.bool(False))
+
+        filename_data = ffi.cast("char[]", filename)
+
+        lib.distributed_tree_to_vtk(filename_data, balanced_data)
+
+    def write_hdf5(self, filename):
+        """
+        Save tree in HDF5 format.
+
+        Parameters
+        ----------
+        filename: str
+        """
+        pass
+
+    @staticmethod
+    def read_json(filename):
+        pass
+
+    def write_json(self, filename):
+        """
+        Serialize tree in JSON format.
+
+        Parameters
+        ----------
+        filename: str
+        """
+        pass
+
+    @staticmethod
+    def read_json(filename):
+        pass

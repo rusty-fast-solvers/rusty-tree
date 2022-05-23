@@ -5,32 +5,25 @@ use std::io::BufWriter;
 use std::path::Path;
 
 use std::iter::FromIterator;
-use vtkio::model::*;
 use std::path::PathBuf;
+use vtkio::model::*;
 
 use serde::Serialize;
 
-
-use crate::types::{
-    point::PointType,
-    morton::MortonKey,
-    domain::Domain
-};
-
+use crate::types::{domain::Domain, morton::MortonKey, point::PointType};
 
 // VTK compatible dataset for visualization
 pub trait VTK {
-
     // Convert a data set to VTK format.
     fn write_vtk(&self, filename: String, domain: &Domain);
 }
 
 // JSON input and output
 pub trait JSON {
-
     // Save data to disk in JSON.
     fn write_json(&self, filename: String) -> Result<(), std::io::Error>
-        where Self: Serialize
+    where
+        Self: Serialize,
     {
         let filepath = Path::new(&filename);
         let file = File::create(filepath)?;
@@ -41,8 +34,9 @@ pub trait JSON {
     }
 
     // Read data from a 1D sequence into a Rust vector.
-    fn read_json<'de, P: AsRef<Path>, T: serde::de::DeserializeOwned>(filepath: P) -> Result<Vec<T>, std::io::Error>
-    {
+    fn read_json<'de, P: AsRef<Path>, T: serde::de::DeserializeOwned>(
+        filepath: P,
+    ) -> Result<Vec<T>, std::io::Error> {
         let file = File::open(filepath)?;
         let reader = BufReader::new(file);
         let result: Vec<T> = serde_json::from_reader(reader)?;
@@ -50,10 +44,8 @@ pub trait JSON {
     }
 }
 
-
 // HDF5 input and output
 pub trait HDF5<T: hdf5::H5Type> {
-
     // Save a Rust 1D vector to disk.
     fn write_hdf5<P: AsRef<Path>>(&self, filename: P) -> hdf5::Result<()>;
 

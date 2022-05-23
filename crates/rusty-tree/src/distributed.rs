@@ -1,8 +1,10 @@
 //! Data structures and methods to create distributed Octrees with MPI.
 
 use std::collections::{HashMap, HashSet};
+use std::convert::TryInto;
 
 use mpi::{
+    Count,
     topology::{Rank, UserCommunicator},
     traits::*,
 };
@@ -11,6 +13,7 @@ use hyksort::hyksort::hyksort;
 
 use crate::{
     constants::{K, NCRIT, ROOT},
+    data::{HDF5, JSON, VTK},
     single_node::Tree,
     types::{
         domain::Domain,
@@ -32,6 +35,9 @@ pub struct DistributedTree {
 
     /// The nodes that span the tree, defined by its leaf nodes.
     pub keys: Vec<MortonKey>,
+
+    /// Domain spanned by the points in the tree.
+    pub domain: Domain,
 }
 
 impl DistributedTree {
@@ -52,6 +58,7 @@ impl DistributedTree {
                 points,
                 keys,
                 points_to_keys,
+                domain,
             }
         } else {
             let (points, points_to_keys) = DistributedTree::unbalanced_tree(world, points, &domain);
@@ -62,6 +69,7 @@ impl DistributedTree {
                 points,
                 keys,
                 points_to_keys,
+                domain,
             }
         }
     }
@@ -133,7 +141,7 @@ impl DistributedTree {
     /// Create a mapping between octree elements at a coarser (nodes) and finer (leaves) level.
     fn assign_nodes_to_leaves(
         leaves: &Vec<MortonKey>,
-        nodes: Vec<MortonKey>,
+        nodes: &Vec<MortonKey>,
     ) -> HashMap<MortonKey, MortonKey> {
         let nodes: HashSet<MortonKey> = nodes.iter().cloned().collect();
         let mut map: HashMap<MortonKey, MortonKey> = HashMap::new();
@@ -166,8 +174,7 @@ impl DistributedTree {
             let mut new_blocktree: Vec<MortonKey> = Vec::new();
 
             // Map between blocks and the leaves they contain
-            let blocks_to_leaves =
-                DistributedTree::assign_nodes_to_leaves(leaves, blocktree.clone());
+            let blocks_to_leaves = DistributedTree::assign_nodes_to_leaves(leaves, &blocktree);
 
             // Count the number of points in a block
             let mut blocks_to_npoints: HashMap<MortonKey, usize> = HashMap::new();
@@ -201,7 +208,7 @@ impl DistributedTree {
         }
 
         // Assign nodes in the split blocktree to all leaves
-        DistributedTree::assign_nodes_to_leaves(leaves, split_blocktree)
+        DistributedTree::assign_nodes_to_leaves(leaves, &split_blocktree)
     }
 
     /// Find the seeds, defined as coarsest leaf/leaves, at each processor [1].
@@ -393,7 +400,7 @@ impl DistributedTree {
         // 7.ii Assign the local leaves to the elements of this new balanced tree
         let points_to_balanced = DistributedTree::assign_nodes_to_leaves(
             &points.iter().map(|p| p.key).collect(),
-            linearized.keys,
+            &linearized.keys,
         );
 
         let mut points: Vec<Point> = points
@@ -418,9 +425,102 @@ impl DistributedTree {
         // 10. Map points to non-overlapping tree
         let map = DistributedTree::assign_nodes_to_leaves(
             &points.iter().map(|p| p.key).collect(),
-            tree.keys,
+            &tree.keys,
         );
 
         (points, map)
+    }
+
+    /// Read a tree from a from a HDF5 file, and redistribute over nodes.
+    pub fn read_hdf5(world: &UserCommunicator, filepath: String) -> DistributedTree {
+        let file = hdf5::File::create(&filepath).unwrap();
+
+        let keys = Vec::<MortonKey>::read_hdf5(&filepath).unwrap();
+        let points = Vec::<Point>::read_hdf5(&filepath).unwrap();
+        let balanced: bool = file.attr("balanced").unwrap().read_scalar().unwrap();
+        let domain = file.group("domain").unwrap();
+
+        let origin: [PointType; 3] = domain
+            .dataset("origin")
+            .unwrap()
+            .read_raw::<PointType>()
+            .unwrap()[0..3]
+            .try_into()
+            .unwrap();
+
+        let diameter: [PointType; 3] = domain
+            .dataset("diameter")
+            .unwrap()
+            .read_raw::<PointType>()
+            .unwrap()[0..3]
+            .try_into()
+            .unwrap();
+
+        let domain = Domain { origin, diameter };
+
+        let points_to_keys =
+            DistributedTree::assign_nodes_to_leaves(&points.iter().map(|p| p.key).collect(), &keys);
+
+        DistributedTree {
+            keys,
+            points,
+            points_to_keys,
+            balanced,
+            domain,
+        }
+    }
+
+    /// Save a distributed tree to a hdf5 file.
+    pub fn write_hdf5(
+        world: &UserCommunicator,
+        filename: String,
+        tree: DistributedTree,
+    ) {
+        // Communicate global data to root process
+        let comm = world.duplicate();
+        let rank = comm.rank();
+        let size = comm.size();
+
+        let root_rank = 0;
+        let root_process = comm.process_at_rank(root_rank);
+
+        // Gather the keys
+        // let local_keys = tree.keys;
+        let nlocal_keys: u64 = tree.keys.len() as u64;
+
+        let mut global_key_counts: Vec<Count> = vec![0; size as usize];
+        if rank == root_rank {
+            root_process.gather_into_root(&nlocal_keys, &mut global_key_counts[..]);
+        } else {
+            root_process.gather_into(&nlocal_keys);
+        }
+
+        
+
+        // Write to file on root process
+        let global_keys: Vec<MortonKey> = Vec::new();
+        let global_points: Vec<Point> = Vec::new();
+        let global_domain: Domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [0., 0., 0.],
+        };
+
+        let file = hdf5::File::create(filename).unwrap();
+
+        let keys = file.new_dataset::<MortonKey>().create("keys").unwrap();
+        keys.write(&global_keys);
+
+        let points = file.new_dataset::<Point>().create("points").unwrap();
+        points.write(&global_points);
+
+        let attr_builder = file.new_attr::<bool>();
+        let attr = attr_builder.create("balanced").unwrap();
+        attr.write_scalar(&tree.balanced);
+
+        let domain = file.create_group("domain").unwrap();
+        let origin = domain.new_dataset::<Point>().create("origin").unwrap();
+        let diameter = domain.new_dataset::<Point>().create("diameter").unwrap();
+        origin.write(&global_domain.origin);
+        diameter.write(&global_domain.diameter);
     }
 }
