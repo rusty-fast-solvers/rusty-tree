@@ -452,6 +452,7 @@ impl DistributedTree {
 
             // Communicator sizes have to match to replicate tree
             if experiment_size != size {
+                println!("Experiment size doesn't match world size!");
                 comm.abort(1);
             } else {
                 let global_key_counts: Vec<Count> = file
@@ -486,6 +487,7 @@ impl DistributedTree {
 
             // Communicator sizes have to match to replicate tree
             if experiment_size != size {
+                println!("Experiment size doesn't match world size!");
                 comm.abort(1);
             } else {
                 // Read global data into master process
