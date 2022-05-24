@@ -1,6 +1,7 @@
 //! Wrappers for Distributed Tree interface
 use mpi::{ffi::MPI_Comm, topology::UserCommunicator, traits::*};
 use std::ffi::CString;
+use std::ffi::CStr;
 use std::os::raw::c_char;
 
 use crate::{
@@ -77,26 +78,29 @@ pub extern "C" fn distributed_tree_write_vtk(
 
 #[no_mangle]
 pub extern "C" fn distributed_tree_write_hdf5(
-    comm: *mut usize,
+    world: *mut usize,
     p_tree: *const DistributedTree,
     p_filename: *mut c_char,
 ) {
     let filename = unsafe { CString::from_raw(p_filename).to_str().unwrap().to_string() };
     let tree = unsafe { &*p_tree };
 
-    let comm = std::mem::ManuallyDrop::new(unsafe {
-        UserCommunicator::from_raw(*(comm as *const MPI_Comm)).unwrap()
+    let world = std::mem::ManuallyDrop::new(unsafe {
+        UserCommunicator::from_raw(*(world as *const MPI_Comm)).unwrap()
     });
 
-    DistributedTree::write_hdf5(&comm, filename, tree);
+    DistributedTree::write_hdf5(&world, filename, tree).unwrap();
 }
 
 #[no_mangle]
 pub extern "C" fn distributed_tree_read_hdf5(
     world: *mut usize,
     p_filepath: *mut c_char,
-) -> *mut DistributedTree {
-    let filepath = unsafe { CString::from_raw(p_filepath).to_str().unwrap().to_string() };
+){
+    let c_filepath = unsafe { CStr::from_ptr(p_filepath)};
+    let filepath_slice: &str = c_filepath.to_str().unwrap();
+
+    println!("HERE {:?}", filepath)
     let world = std::mem::ManuallyDrop::new(unsafe {
         UserCommunicator::from_raw(*(world as *const MPI_Comm)).unwrap()
     });
