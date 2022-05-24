@@ -15,27 +15,11 @@ class DistributedTree:
     (N,3) stored in NumPy arrays on each processor. Trees can optionally be
     balanced.
 
-    Example Usage:
-    --------------
-    >>> from mpi4py import MPI
-    >>> import numpy as np
-
-    >>> from rusty_tree.distributed import DistributedTree
-
-    >>> # Setup MPI communicator
-    >>> comm = MPI.COMM_WORLD
-
-    >>> # Initialize points at the current processor
-    >>> points = np.random.rand(1000, 3)
-
-    >>> # Create a balanced, distributed, tree from a set of globally
-    >>> # distributed points
-    >>> tree = DistributedTree.from_global_points(points, True, comm)
     """
 
     def __init__(self, p_tree, comm, p_comm, raw_comm):
         """
-        Don't directly use constructor, instead use the provided class method
+        Don't directly use constructor, instead use the provided class methods
         to create a DistributedTree from a set of points, distributed globally
         across the set of processors provided to the constructor via its
         communicator.
@@ -82,6 +66,23 @@ class DistributedTree:
         Returns
         -------
         DistributedTree
+
+        Example Usage:
+        --------------
+        >>> from mpi4py import MPI
+        >>> import numpy as np
+
+        >>> from rusty_tree.distributed import DistributedTree
+
+        >>> # Setup MPI communicator
+        >>> comm = MPI.COMM_WORLD
+
+        >>> # Initialize points at the current processor
+        >>> points = np.random.rand(1000, 3)
+
+        >>> # Create a balanced, distributed, tree from a set of globally
+        >>> # distributed points
+        >>> tree = DistributedTree.from_global_points(points, True, comm)
         """
         points = np.array(points, dtype=np.float64, order="C", copy=False)
         npoints, _ = points.shape
@@ -100,10 +101,52 @@ class DistributedTree:
             raw_comm,
         )
 
+    @classmethod
+    def read_hdf5(cls, filepath, comm):
+        """
+        Instantiate a tree from tree data serialized with HDF5 on the master node,
+        and distribute over processes in provided communicator.
+
+        Parameters
+        ----------
+        filepath: Path
+            Posix compliant path.
+
+        Returns
+        -------
+        DistributedTree
+
+        Example Usage:
+        --------------
+        >>> from mpi4py import MPI
+        >>> import numpy as np
+
+        >>> from rusty_tree.distributed import DistributedTree
+
+        >>> # Setup MPI communicator
+        >>> comm = MPI.COMM_WORLD
+
+        >>> # Read a balanced, distributed tree from disk
+        >>> tree = DistributedTree.read_hdf5('/path/to/file.hdf5', comm)
+        """
+
+        filepath_str = str(filepath.resolve(strict=True))
+        filepath_data = ffi.cast("char[]*", filepath_str)
+
+        p_comm = MPI._addressof(comm)
+        raw_comm = ffi.cast("uintptr_t*", p_comm)
+
+        return cls(
+            lib.distributed_tree_read_hdf5(raw_comm, filepath_data),
+            comm,
+            p_comm,
+            raw_comm
+        )
+
     def write_vtk(self, filename):
         """
-        Export leaves to VTK file for visualization. Saved in current
-        working directory.
+        Serialize leaves of a distributed tree in VTK format for visualization
+        on the master node.
 
         Parameters
         ----------
@@ -130,27 +173,3 @@ class DistributedTree:
         filename_data = ffi.cast("char[]*", filename)
 
         lib.distributed_tree_write_hdf5(raw_comm, self.ctype, filename_data)
-
-    @classmethod
-    def read_hdf5(cls, filepath):
-        """
-        Instantiate a tree from tree data serialized with HDF5 on the master node,
-        and distribute over processes in provided communicator.
-
-        Parameters
-        ----------
-        filepath: Path
-            Posix compliant path.
-
-        Returns
-        -------
-        DistributedTree
-        """
-
-        filepath_str = str(filepath.resolve(strict=True))
-        filepath_data = ffi.cast("char[]*", filename)
-        comm = self.comm.duplicate()
-        p_comm = MPI._addressof(comm)
-        raw_comm = ffi.cast("uintptr_t*", p_comm)
-
-        return lib.distributed_tree_read_hdf5(raw_comm, filepath_data)
