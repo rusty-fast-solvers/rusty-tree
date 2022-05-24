@@ -52,5 +52,5 @@ fn main() {
 
     let tree = DistributedTree::read_hdf5(&comm, "foo.hdf5".to_string());
 
-    println!("rank {:?} tree {:?}",world.rank(), tree.keys.len())
+    println!("rank {:?} tree {:?}", world.rank(), tree.keys.len())
 }
