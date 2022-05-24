@@ -7,7 +7,6 @@ use rand::SeedableRng;
 
 use rusty_tree::{
     constants::{NCRIT, ROOT},
-    data::VTK,
     distributed::DistributedTree,
     types::{domain::Domain, morton::MortonKey},
 };

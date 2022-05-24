@@ -1,24 +1,54 @@
 use rusty_tree::data::HDF5;
+use rusty_tree::distributed::DistributedTree;
 use rusty_tree::types::morton::MortonKey;
 use rusty_tree::types::point::Point;
 
+use mpi::{topology::SystemCommunicator, traits::*};
+
+use rand::prelude::*;
+use rand::SeedableRng;
+const NPOINTS: u64 = 200;
+
+/// Test fixture for NPOINTS randomly distributed points.
+fn points_fixture() -> Vec<[f64; 3]> {
+    let mut range = StdRng::seed_from_u64(0);
+    let between = rand::distributions::Uniform::from(0.0..1.0);
+    let mut points = Vec::new();
+
+    for _ in 0..NPOINTS {
+        points.push([
+            between.sample(&mut range),
+            between.sample(&mut range),
+            between.sample(&mut range),
+        ])
+    }
+    points
+}
+
+/// Test fixture for an unbalanced tree.
+fn unbalanced_tree_fixture(world: &SystemCommunicator) -> DistributedTree {
+    let points = points_fixture();
+
+    let comm = world.duplicate();
+
+    DistributedTree::new(&points, false, &comm)
+}
+
+/// Test fixture for an balanced tree.
+fn balanced_tree_fixture(world: &SystemCommunicator) -> DistributedTree {
+    let points = points_fixture();
+    let comm = world.duplicate();
+
+    DistributedTree::new(&points, true, &comm)
+}
 fn main() {
-    let key = MortonKey {
-        anchor: [0, 0, 0],
-        morton: 0,
-    };
+    let universe = mpi::initialize().unwrap();
+    let world = universe.world();
 
-    let points = vec![Point {
-        global_idx: 0,
-        coordinate: [0.0, 0.0, 0.0],
-        key: key,
-    }];
+    let balanced = balanced_tree_fixture(&world);
 
-    // Write hdf5
-    // points.write_hdf5("test.h5");
+    let comm = world.duplicate();
+    DistributedTree::write_hdf5(&comm, "foo".to_string(), &balanced);
 
-    // Read hdf5
-    // let read: Vec<Point> = Vec::<Point>::read_hdf5("test.h5").unwrap();
-    // println!("here {:?}", points);
-    // println!("here {:?}", read);
+    // let tree = DistributedTree::read_hdf5(&comm, "test_tree.hdf5".to_string());
 }

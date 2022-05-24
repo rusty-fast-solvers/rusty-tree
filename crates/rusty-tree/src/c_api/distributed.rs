@@ -91,15 +91,15 @@ pub extern "C" fn distributed_tree_write_hdf5(
     DistributedTree::write_hdf5(&comm, filename, tree);
 }
 
-#[no_mangle]
-pub extern "C" fn distributed_tree_read_hdf5(
-    world: *mut usize,
-    p_filepath: *mut c_char,
-) -> *mut DistributedTree {
-    let filepath = unsafe { CString::from_raw(p_filepath).to_str().unwrap().to_string() };
-    let world = std::mem::ManuallyDrop::new(unsafe {
-        UserCommunicator::from_raw(*(world as *const MPI_Comm)).unwrap()
-    });
+// #[no_mangle]
+// pub extern "C" fn distributed_tree_read_hdf5(
+//     world: *mut usize,
+//     p_filepath: *mut c_char,
+// ) -> *mut DistributedTree {
+//     let filepath = unsafe { CString::from_raw(p_filepath).to_str().unwrap().to_string() };
+//     let world = std::mem::ManuallyDrop::new(unsafe {
+//         UserCommunicator::from_raw(*(world as *const MPI_Comm)).unwrap()
+//     });
 
-    Box::into_raw(Box::new(DistributedTree::read_hdf5(&world, filepath)))
-}
+//     Box::into_raw(Box::new(DistributedTree::read_hdf5(&world, filepath)))
+// }
