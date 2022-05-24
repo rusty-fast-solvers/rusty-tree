@@ -48,7 +48,9 @@ fn main() {
     let balanced = balanced_tree_fixture(&world);
 
     let comm = world.duplicate();
-    DistributedTree::write_hdf5(&comm, "foo".to_string(), &balanced);
+    // DistributedTree::write_hdf5(&comm, "foo".to_string(), &balanced);
 
-    // let tree = DistributedTree::read_hdf5(&comm, "test_tree.hdf5".to_string());
+    let tree = DistributedTree::read_hdf5(&comm, "foo.hdf5".to_string());
+
+    println!("rank {:?} tree {:?}",world.rank(), tree.keys.len())
 }
