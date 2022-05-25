@@ -29,3 +29,7 @@ rusty_tree/rusty_tree/*
 
 # Editor
 .vscode/*
+
+# Data
+*.hdf5
+*.vtk

@@ -20,6 +20,7 @@
 
 pub mod c_api;
 pub mod constants;
+pub mod data;
 pub mod distributed;
 pub mod single_node;
 pub mod types;

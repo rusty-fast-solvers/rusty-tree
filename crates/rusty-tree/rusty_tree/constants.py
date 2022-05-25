@@ -12,7 +12,7 @@ from rusty_tree.types.morton import MortonKey
 def load_cbuffer(c_buffer, shape, dtype):
     """
     Load C Buffer into a Numpy Buffer.
-    
+
     Parameters
     ----------
     c_buffer: cdata 'Buffer *'

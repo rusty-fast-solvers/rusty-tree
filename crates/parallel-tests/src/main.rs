@@ -11,7 +11,7 @@ use rusty_tree::{
     types::{domain::Domain, morton::MortonKey},
 };
 
-const NPOINTS: u64 = 1000;
+const NPOINTS: u64 = 100000;
 
 /// Test fixture for NPOINTS randomly distributed points.
 fn points_fixture() -> Vec<[f64; 3]> {

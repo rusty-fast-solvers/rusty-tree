@@ -5,6 +5,9 @@ use itertools::izip;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
+use std::iter::FromIterator;
+use std::path::Path;
+use std::path::PathBuf;
 
 use memoffset::offset_of;
 use mpi::{
@@ -12,19 +15,24 @@ use mpi::{
     Address,
 };
 
+use hdf5::H5Type;
+use serde::{Deserialize, Serialize};
+use vtkio::model::*;
+
 use crate::{
     constants::{
         BYTE_DISPLACEMENT, BYTE_MASK, DEEPEST_LEVEL, DIRECTIONS, LEVEL_DISPLACEMENT, LEVEL_MASK,
         LEVEL_SIZE, NINE_BIT_MASK, X_LOOKUP_DECODE, X_LOOKUP_ENCODE, Y_LOOKUP_DECODE,
         Y_LOOKUP_ENCODE, Z_LOOKUP_DECODE, Z_LOOKUP_ENCODE,
     },
+    data::{HDF5, JSON, VTK},
     types::{domain::Domain, point::PointType},
 };
 
 pub type KeyType = u64;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, H5Type)]
 /// Representation of a Morton key with an 'anchor' specifying the origin of the node it encodes
 /// with respect to the deepest level of the octree, as well as 'morton', a bit-interleaved single
 /// integer representation.
@@ -369,6 +377,121 @@ impl PartialOrd for MortonKey {
 impl Hash for MortonKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.morton.hash(state);
+    }
+}
+
+impl JSON for Vec<MortonKey> {}
+
+impl HDF5<MortonKey> for Vec<MortonKey> {
+    fn write_hdf5<P: AsRef<Path>>(&self, filename: P) -> hdf5::Result<()> {
+        let file = hdf5::File::create(filename)?;
+        let keys = file.new_dataset::<MortonKey>().create("keys")?;
+        keys.write(self)?;
+
+        Ok(())
+    }
+
+    fn read_hdf5<P: AsRef<Path>>(filepath: P) -> hdf5::Result<Vec<MortonKey>> {
+        let file = hdf5::File::open(filepath)?;
+        let keys = file.dataset("keys")?;
+        let keys: Vec<MortonKey> = keys.read_raw::<MortonKey>()?;
+
+        Ok(keys)
+    }
+}
+
+/// Serialize a Morton Key for VTK visualization.
+fn serialize_morton_key(key: MortonKey, domain: &Domain) -> Vec<f64> {
+    let anchor = key.anchor;
+
+    let mut serialized = Vec::<PointType>::with_capacity(24);
+
+    let disp = 1 << (LEVEL_DISPLACEMENT + 1 - key.level() as usize);
+
+    let anchors = [
+        [anchor[0], anchor[1], anchor[2]],
+        [disp + anchor[0], anchor[1], anchor[2]],
+        [anchor[0], disp + anchor[1], anchor[2]],
+        [disp + anchor[0], disp + anchor[1], anchor[2]],
+        [anchor[0], anchor[1], disp + anchor[2]],
+        [disp + anchor[0], anchor[1], disp + anchor[2]],
+        [anchor[0], disp + anchor[1], disp + anchor[2]],
+        [disp + anchor[0], disp + anchor[1], disp + anchor[2]],
+    ];
+
+    for anchor in anchors.iter() {
+        let coords = MortonKey::from_anchor(anchor).to_coordinates(domain);
+        for index in 0..3 {
+            serialized.push(coords[index]);
+        }
+    }
+
+    serialized
+}
+
+// VTK output.
+impl VTK for Vec<MortonKey> {
+    // Save data to a VTK file for visualization.
+    fn write_vtk(&self, filename: String, domain: &Domain) {
+        let n_keys = self.len();
+        let filename = format!("{}.vtk", filename);
+
+        // We use a vtk voxel type, which has
+        // 8 points per cell, i.e. 24 float numbers
+        // per cell.
+        let num_floats = 3 * 8 * n_keys;
+        let mut cell_points = Vec::<f64>::with_capacity(num_floats);
+
+        for &key in self {
+            let serialized = serialize_morton_key(key, domain);
+            cell_points.extend(serialized);
+        }
+
+        let num_points = 8 * (n_keys as u64); // + (num_particles as u64);
+
+        let connectivity = Vec::<u64>::from_iter(0..num_points);
+        let mut offsets = Vec::<u64>::from_iter((0..(n_keys as u64)).map(|item| 8 * item + 8));
+        offsets.push(num_points);
+
+        let mut types = vec![CellType::Voxel; n_keys];
+        types.push(CellType::PolyVertex);
+
+        let mut cell_data = Vec::<i32>::with_capacity(num_points as usize);
+
+        for _ in 0..n_keys {
+            cell_data.push(0);
+        }
+        cell_data.push(1);
+
+        let model = Vtk {
+            version: Version { major: 1, minor: 0 },
+            title: String::new(),
+            byte_order: ByteOrder::BigEndian,
+            file_path: Some(PathBuf::from(&filename)),
+            data: DataSet::inline(UnstructuredGridPiece {
+                points: IOBuffer::F64(cell_points),
+                cells: Cells {
+                    cell_verts: VertexNumbers::XML {
+                        connectivity: connectivity,
+                        offsets: offsets,
+                    },
+                    types: types,
+                },
+                data: Attributes {
+                    point: vec![],
+                    cell: vec![Attribute::DataArray(DataArrayBase {
+                        name: String::from("nodes"),
+                        elem: ElementType::Scalars {
+                            num_comp: 1,
+                            lookup_table: None,
+                        },
+                        data: IOBuffer::I32(cell_data),
+                    })],
+                },
+            }),
+        };
+
+        model.export_ascii(filename).unwrap();
     }
 }
 
