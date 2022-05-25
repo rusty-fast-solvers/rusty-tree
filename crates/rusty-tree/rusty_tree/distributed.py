@@ -129,7 +129,6 @@ class DistributedTree:
         >>> tree = DistributedTree.read_hdf5('/path/to/file.hdf5', comm)
         """
 
-        # filepath_str = str(filepath.resolve(strict=True)).encode('ascii')
         filepath_data = ffi.new("char[]", filepath.encode("ascii"))
         p_filepath = ffi.cast("char *", ffi.addressof(filepath_data))
         p_comm = MPI._addressof(comm)
