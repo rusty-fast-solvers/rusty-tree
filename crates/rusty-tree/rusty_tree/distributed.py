@@ -130,16 +130,13 @@ class DistributedTree:
         """
 
         # filepath_str = str(filepath.resolve(strict=True)).encode('ascii')
-        filepath_data = ffi.new("char[]", filepath.encode('ascii'))
+        filepath_data = ffi.new("char[]", filepath.encode("ascii"))
         p_filepath = ffi.cast("char *", ffi.addressof(filepath_data))
         p_comm = MPI._addressof(comm)
         raw_comm = ffi.cast("uintptr_t*", p_comm)
 
         return cls(
-            lib.distributed_tree_read_hdf5(raw_comm, p_filepath),
-            comm,
-            p_comm,
-            raw_comm
+            lib.distributed_tree_read_hdf5(raw_comm, p_filepath), comm, p_comm, raw_comm
         )
 
     def write_vtk(self, filename):
@@ -151,7 +148,7 @@ class DistributedTree:
         ----------
         filename: str
         """
-        filename_data = ffi.new("char[]", filename.encode('ascii'))
+        filename_data = ffi.new("char[]", filename.encode("ascii"))
         p_filename = ffi.cast("char *", ffi.addressof(filename_data))
 
         lib.distributed_tree_write_vtk(self.raw_comm, self.ctype, p_filename)
@@ -164,7 +161,7 @@ class DistributedTree:
         ----------
         filename: str
         """
-        filename_data = ffi.new("char[]", filename.encode('ascii'))
+        filename_data = ffi.new("char[]", filename.encode("ascii"))
         p_filename = ffi.cast("char *", ffi.addressof(filename_data))
 
         lib.distributed_tree_write_hdf5(self.raw_comm, self.ctype, p_filename)
