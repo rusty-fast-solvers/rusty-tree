@@ -434,6 +434,7 @@ impl VTK for Vec<MortonKey> {
     // Save data to a VTK file for visualization.
     fn write_vtk(&self, filename: String, domain: &Domain) {
         let n_keys = self.len();
+        let filename = format!("{}.vtk", filename);
 
         // We use a vtk voxel type, which has
         // 8 points per cell, i.e. 24 float numbers

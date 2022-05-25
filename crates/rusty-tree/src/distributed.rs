@@ -731,4 +731,56 @@ impl DistributedTree {
             Ok(())
         }
     }
+
+    pub fn write_vtk(world: &UserCommunicator, filename: String, tree: &DistributedTree) {
+        let comm = world.duplicate();
+        let rank = comm.rank();
+        let size = comm.size();
+
+        // Communicate global leaves and global domain
+        let root_rank = 0;
+        let root_process = comm.process_at_rank(root_rank);
+
+        // Gather the keys
+        let local_keys = &tree.keys;
+
+        let nlocal_keys: Count = tree.keys.len() as Count;
+
+        let mut global_key_counts: Vec<Count> = vec![0; size as usize];
+
+        if rank == root_rank {
+            root_process.gather_into_root(&nlocal_keys, &mut global_key_counts[..]);
+        } else {
+            root_process.gather_into(&nlocal_keys);
+        }
+
+        // Write to file on root process
+        if rank == root_rank {
+            // Calculate point and key displacements
+            let global_key_displs: Vec<Count> = global_key_counts
+                .iter()
+                .scan(0, |acc, &x| {
+                    let tmp = *acc;
+                    *acc += x;
+                    Some(tmp)
+                })
+                .collect();
+
+            // Buffer for global keys
+            let global_key_count: usize = global_key_counts.iter().sum::<Count>() as usize;
+            let mut global_keys: Vec<MortonKey> =
+                vec![MortonKey::default(); global_key_count as usize];
+
+            let mut key_partition = PartitionMut::new(
+                &mut global_keys[..],
+                global_key_counts.clone(),
+                &global_key_displs[..],
+            );
+            root_process.gather_varcount_into_root(&local_keys[..], &mut key_partition);
+
+            global_keys.write_vtk(filename, &tree.domain);
+        } else {
+            root_process.gather_varcount_into(&local_keys[..]);
+        }
+    }
 }
