@@ -732,6 +732,7 @@ impl DistributedTree {
         }
     }
 
+    /// Serialize a DistributedTree's keys to VTK for visualization.
     pub fn write_vtk(world: &UserCommunicator, filename: String, tree: &DistributedTree) {
         let comm = world.duplicate();
         let rank = comm.rank();
