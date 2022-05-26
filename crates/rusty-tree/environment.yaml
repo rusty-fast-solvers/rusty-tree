@@ -3,9 +3,9 @@ channels:
   - conda-forge
   - anaconda
 dependencies:
-  #  - gcc # [linux]
+   - gcc # [linux]
   - clang
-  - hdf5
+  # - hdf5
   - mpich-mpicc
   - conda-build
   - rust
