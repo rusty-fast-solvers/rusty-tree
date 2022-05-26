@@ -40,12 +40,12 @@ jobs:
         shell: bash -l {0}
         run: conda install anaconda-client
 
-      - name: Upload Linux (${{ matrix.python-version }})
+      - name: Upload Linux (Python ${{ matrix.python-version }})
         if: runner.os == 'Linux'
         shell: bash -l {0}
         run: anaconda -t ${{ secrets.ANACONDA }} upload --force --user skailasa  /usr/share/miniconda/envs/test/conda-bld/linux-64/rusty_tree-*.tar.bz2
 
-      - name: Upload Mac (${{ matrix.python-version }})
+      - name: Upload Mac (Python ${{ matrix.python-version }})
         if: runner.os == 'macOS'
         shell: bash -l {0}
         run: anaconda -t ${{ secrets.ANACONDA }} upload --force --user skailasa  /usr/local/miniconda/envs/test/conda-bld/osx-64/rusty_tree-*.tar.bz2
