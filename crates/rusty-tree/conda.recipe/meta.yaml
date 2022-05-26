@@ -12,6 +12,7 @@ requirements:
 
   host:
     - mpich-mpicc
+    - hdf5
     - rust
     - python
     - pip
@@ -21,8 +22,9 @@ requirements:
   run:
     - mpich-mpicc
     - python
+    - hdf5
     - numpy 1.22.2
     - cffi >=1.15
 
 build:
-  script: maturin build --release && python -m pip install .
+  script: export HDF5_DIR=$PREFIX && maturin build --release && python -m pip install .

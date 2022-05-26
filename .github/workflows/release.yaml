@@ -1,6 +1,6 @@
 name: Publish To Anaconda
 
-on: push 
+on: push
   # release:
   #   types: [published]
 
@@ -30,18 +30,7 @@ jobs:
         shell: bash -l {0}
         run: |
           conda install conda-verify
-      
-      - name: Install HDF5 (Linux)
-        if: runner.os == 'Linux'
-        shell: bash -l {0}
-        run: sudo apt-get install libhdf5-serial-dev
-      
-      - name: Install HDF5 (Mac) 
-        if: runner.os == 'macOS'
-        shell: bash -l {0}
-        run: brew install hdf5
 
-    
       - name: Build
         shell: bash -l {0}
         working-directory: crates/rusty-tree/
