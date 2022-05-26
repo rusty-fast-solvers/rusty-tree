@@ -47,21 +47,21 @@ jobs:
         shell: bash -l {0}
         run: export HDF5_DIR='${{ env.HDF5_DIR_MACOS }}' && export RUSTFLAGS='${{ env.RUSTFLAGS_MACOS }}'
     
-      # - name: Build
-      #   shell: bash -l {0}
-      #   working-directory: crates/rusty-tree/
-      #   run: conda build -c conda-forge -c anaconda conda.recipe --py ${{ matrix.python-version }}
+      - name: Build
+        shell: bash -l {0}
+        working-directory: crates/rusty-tree/
+        run: conda build -c conda-forge -c anaconda conda.recipe --py ${{ matrix.python-version }}
 
-      # - name: Install Anaconda Client
-      #   shell: bash -l {0}
-      #   run: conda install anaconda-client
+      - name: Install Anaconda Client
+        shell: bash -l {0}
+        run: conda install anaconda-client
 
-      # - name: Upload Linux (${{ matrix.python-version }})
-      #   if: runner.os == 'Linux'
-      #   shell: bash -l {0}
-      #   run: anaconda -t ${{ secrets.ANACONDA }} upload --force --user skailasa  /usr/share/miniconda/envs/test/conda-bld/linux-64/rusty_tree-*.tar.bz2
+      - name: Upload Linux (${{ matrix.python-version }})
+        if: runner.os == 'Linux'
+        shell: bash -l {0}
+        run: anaconda -t ${{ secrets.ANACONDA }} upload --force --user skailasa  /usr/share/miniconda/envs/test/conda-bld/linux-64/rusty_tree-*.tar.bz2
 
-      # - name: Upload Mac (${{ matrix.python-version }})
-      #   if: runner.os == 'macOS'
-      #   shell: bash -l {0}
-      #   run: anaconda -t ${{ secrets.ANACONDA }} upload --force --user skailasa  /usr/local/miniconda/envs/test/conda-bld/osx-64/rusty_tree-*.tar.bz2
+      - name: Upload Mac (${{ matrix.python-version }})
+        if: runner.os == 'macOS'
+        shell: bash -l {0}
+        run: anaconda -t ${{ secrets.ANACONDA }} upload --force --user skailasa  /usr/local/miniconda/envs/test/conda-bld/osx-64/rusty_tree-*.tar.bz2
