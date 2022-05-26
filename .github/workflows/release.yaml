@@ -6,7 +6,7 @@ on: push
 
 env: 
   HDF5_DIR_MACOS: "/usr/local/miniconda/envs/test/"
-  RUSTFLAGS_MAC: "-C link-args=-Wl,-rpath,/usr/local/miniconda/envs/test/include/lib"
+  RUSTFLAGS_MACOS: "-C link-args=-Wl,-rpath,/usr/local/miniconda/envs/test/include/lib"
   HDF5_DIR_LINUX: "/usr/share/miniconda/envs/test/"
   RUSTFLAGS_LINUX: "-C link-args=-Wl,-rpath /usr/share/miniconda/envs/test/include/lib"
 
