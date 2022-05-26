@@ -40,12 +40,12 @@ jobs:
       - name: Set Linux Env Vars
         if: runner.os == 'Linux'
         shell: bash -l {0}
-        run: export HDF5_DIR=${{ env.HDF5_DIR_LINUX }} && export RUSTFLAGS=${{ env.RUSTFLAGS_LINUX }}
+        run: export HDF5_DIR='${{ env.HDF5_DIR_LINUX }}' && export RUSTFLAGS='${{ env.RUSTFLAGS_LINUX }}'
       
       - name: Set Mac Env Vars
         if: runner.os == 'macOS'
         shell: bash -l {0}
-        run: export HDF5_DIR=${{ env.HDF5_DIR_MACOS }} && export RUSTFLAGS=${{ env.RUSTFLAGS_MACOS }}
+        run: export HDF5_DIR='${{ env.HDF5_DIR_MACOS }}' && export RUSTFLAGS='${{ env.RUSTFLAGS_MACOS }}'
     
       # - name: Build
       #   shell: bash -l {0}
