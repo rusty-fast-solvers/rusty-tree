@@ -27,4 +27,5 @@ requirements:
     - cffi >=1.15
 
 build:
+  # SET HDF5_DIR as root of conda build environment for rust dependency to find headers
   script: export HDF5_DIR=$PREFIX && maturin build --release && python -m pip install .
