@@ -1,6 +1,6 @@
 [package]
 name = "rusty-tree"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["Timo Betcke <timo.betcke@gmail.com>", "Srinath Kailasa <srinathkailasa@gmail.com>"]
 edition = "2018"
 description = "Octree data structures in Rust."
