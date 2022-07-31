@@ -11,6 +11,7 @@ use mpi::{
 use crate::types::point::PointType;
 
 /// A domain is defined by an origin coordinate, and its diameter along all three Cartesian axes.
+#[repr(C)]
 #[derive(Debug, Clone, Default)]
 pub struct Domain {
     pub origin: [PointType; 3],
@@ -118,9 +119,9 @@ impl Domain {
             .diameter[2];
 
         let max_diameter = [
-            max_origin[0] + max_x,
-            max_origin[1] + max_y,
-            max_origin[2] + max_z,
+            max_x,
+            max_y,
+            max_z,
         ];
 
         Domain {
