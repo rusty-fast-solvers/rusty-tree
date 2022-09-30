@@ -1,9 +1,9 @@
-name: build
+name: build 
 channels:
   - conda-forge
   - anaconda
 dependencies:
-  - gcc # [linux]
+  #  - gcc # [linux]
   - clang
   - hdf5
   - mpich-mpicc
