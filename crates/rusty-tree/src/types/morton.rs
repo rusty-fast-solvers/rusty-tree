@@ -41,6 +41,10 @@ pub struct MortonKey {
     pub morton: KeyType,
 }
 
+
+/// Vector of **MortonKeys**.
+pub type MortonKeys = Vec<MortonKey>;
+
 unsafe impl Equivalence for MortonKey {
     type Out = UserDatatype;
     fn equivalent_datatype() -> Self::Out {

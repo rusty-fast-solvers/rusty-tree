@@ -18,8 +18,8 @@ use crate::{
     single_node::Tree,
     types::{
         domain::Domain,
-        morton::MortonKey,
-        point::{Point, PointType},
+        morton::{MortonKey, MortonKeys},
+        point::{Point, Points, PointType},
     },
 };
 
@@ -29,13 +29,16 @@ pub struct DistributedTree {
     pub balanced: bool,
 
     ///  A vector of Cartesian points.
-    pub points: Vec<Point>,
+    pub points: Points,
 
     /// Map between the point's minimum leaf encoding, and the nodes in the tree.
-    pub points_to_keys: HashMap<MortonKey, MortonKey>,
+    pub points_to_keys: HashMap<Point, MortonKey>,
+
+    /// Map between the nodes in the tree and the points they contain.
+    pub keys_to_points: HashMap<MortonKey, Points>,
 
     /// The nodes that span the tree, defined by its leaf nodes.
-    pub keys: Vec<MortonKey>,
+    pub keys: MortonKeys,
 
     /// Domain spanned by the points in the tree.
     pub domain: Domain,
@@ -51,25 +54,38 @@ impl DistributedTree {
         let domain = Domain::from_global_points(&points, world);
 
         if balanced {
-            let (points, points_to_keys) = DistributedTree::balanced_tree(world, points, &domain);
-            let keys = points.iter().map(|p| p.key).collect();
+            // let (points, points_to_keys) = DistributedTree::balanced_tree(world, points, &domain);
+            // let keys = points.iter().map(|p| p.key).collect();
+            
+            let points = Points::new();
+            let points_to_keys = HashMap::<Point, MortonKey>::new();
+            let keys_to_points = HashMap::<MortonKey, Points>::new();
+            let keys = MortonKeys::new();
 
             DistributedTree {
                 balanced,
-                points,
-                keys,
+                points, 
                 points_to_keys,
+                keys_to_points,
+                keys,
                 domain,
             }
+
         } else {
-            let (points, points_to_keys) = DistributedTree::unbalanced_tree(world, points, &domain);
-            let keys = points.iter().map(|p| p.key).collect();
+            // let (points, points_to_keys) = DistributedTree::unbalanced_tree(world, points, &domain);
+            // let keys = points.iter().map(|p| p.key).collect();
+            
+            let points = Points::new();
+            let points_to_keys = HashMap::<Point, MortonKey>::new();
+            let keys_to_points = HashMap::<MortonKey, Points>::new();
+            let keys = MortonKeys::new();
 
             DistributedTree {
                 balanced,
                 points,
-                keys,
                 points_to_keys,
+                keys_to_points,
+                keys,
                 domain,
             }
         }
@@ -139,23 +155,25 @@ impl DistributedTree {
         complete
     }
 
-    /// Create a mapping between octree elements at a coarser (nodes) and finer (leaves) level.
-    fn assign_nodes_to_leaves(
-        leaves: &Vec<MortonKey>,
-        nodes: &Vec<MortonKey>,
-    ) -> HashMap<MortonKey, MortonKey> {
+    /// Create a mapping between points and octree nodes, assumed to overlap.
+    fn assign_points_to_nodes(
+        points: &Points,
+        nodes: &MortonKeys,
+    ) -> HashMap<Point, MortonKey> {
+        
         let nodes: HashSet<MortonKey> = nodes.iter().cloned().collect();
-        let mut map: HashMap<MortonKey, MortonKey> = HashMap::new();
+   
+        let mut map: HashMap<Point, MortonKey> = HashMap::new();
 
-        for leaf in leaves.iter() {
-            if nodes.contains(leaf) {
-                map.insert(*leaf, *leaf);
+        for point in points.iter() {
+            if nodes.contains(point.key) {
+                map.insert(*point, *point.key);
             } else {
-                let mut ancestors: Vec<MortonKey> = leaf.ancestors().into_iter().collect();
+                let mut ancestors: Vec<MortonKey> = point.key.ancestors().into_iter().collect();
                 ancestors.sort();
                 for ancestor in ancestors {
                     if nodes.contains(&ancestor) {
-                        map.insert(*leaf, ancestor);
+                        map.insert(*point, ancestor);
                         break;
                     }
                 }
@@ -164,33 +182,26 @@ impl DistributedTree {
         map
     }
 
+
     /// Split octree nodes (blocks) by counting how many particles they contain.
     fn split_blocks(
-        leaves: &Vec<MortonKey>,
-        mut blocktree: Vec<MortonKey>,
-    ) -> HashMap<MortonKey, MortonKey> {
-        let mut split_blocktree: Vec<MortonKey> = Vec::new();
+        points: &Points,
+        mut blocktree: MortonKeys,
+    ) -> (HashMap<Point, MortonKey>, HashMap<MortonKey, Points>) {
+        
+        let mut split_blocktree: MortonKeys = Vec::new();
 
         loop {
-            let mut new_blocktree: Vec<MortonKey> = Vec::new();
+            let mut new_blocktree: MortonKeys = Vec::new();
 
             // Map between blocks and the leaves they contain
-            let blocks_to_leaves = DistributedTree::assign_nodes_to_leaves(leaves, &blocktree);
-
-            // Count the number of points in a block
-            let mut blocks_to_npoints: HashMap<MortonKey, usize> = HashMap::new();
-            for (_, block) in blocks_to_leaves {
-                if let std::collections::hash_map::Entry::Vacant(e) = blocks_to_npoints.entry(block)
-                {
-                    e.insert(1);
-                } else if let Some(b) = blocks_to_npoints.get_mut(&block) {
-                    *b += 1;
-                }
-            }
+            let blocks_to_points = DistributedTree::assign_keys_to_points(points, &blocktree);
 
             // Generate a new blocktree with a block's children if they violate the NCRIT constraint
             let mut check = 0;
-            for (&block, &npoints) in blocks_to_npoints.iter() {
+            for (&block, &points) in blocks_to_points.iter() {
+                let npoints = points.len();
+
                 if npoints > NCRIT {
                     let mut children = block.children();
                     new_blocktree.append(&mut children);
@@ -208,9 +219,14 @@ impl DistributedTree {
             }
         }
 
-        // Assign nodes in the split blocktree to all leaves
-        DistributedTree::assign_nodes_to_leaves(leaves, &split_blocktree)
+        // Create bidirectional maps
+        (
+            DistributedTree::assign_keys_to_points(&split_blocktree, points),
+            DistributedTree::assign_points_to_nodes(points, &split_blocktree)
+        )
+    
     }
+
 
     /// Find the seeds, defined as coarsest leaf/leaves, at each processor [1].
     fn find_seeds(leaves: &[MortonKey]) -> Vec<MortonKey> {
@@ -289,12 +305,38 @@ impl DistributedTree {
         received_points
     }
 
+    /// Map keys to points, assumed to overlap.
+    pub fn assign_keys_to_points(
+        keys: &MortonKeys, points: &Points
+    ) -> HashMap<MortonKey, Points> {
+
+        let mut map : HashMap<MortonKey, Points> = HashMap::new();
+
+        for point in points.iter() {
+            if keys.contains(&point.key) {
+                map.entry(point.key).or_insert(Vec::new()).push(*point);
+            } else {
+                let mut ancestors: Vec<MortonKey> = point.key.ancestors().into_iter().collect();
+                ancestors.sort();
+                for ancestor in ancestors {
+                    map.entry(ancestor).or_insert(Vec::new()).push(*point);
+                    break
+                }
+            }
+        }
+        map
+    }
+
     /// Specialization for unbalanced trees.
     pub fn unbalanced_tree(
         world: &UserCommunicator,
         points: &[[PointType; 3]],
         domain: &Domain,
-    ) -> (Vec<Point>, HashMap<MortonKey, MortonKey>) {
+    ) -> (
+        HashMap<Point, MortonKey>,
+        HashMap<MortonKey, Points>
+    )
+    {
         let rank = world.rank();
         let size = world.size();
 
@@ -332,12 +374,14 @@ impl DistributedTree {
         // 5.ii any data below the min seed sent to partner process
         let points =
             DistributedTree::transfer_points_to_blocktree(world, &points, &seeds, &rank, &size);
+        
+        // 6
+        let (keys_to_points, points_to_keys) = DistributedTree::split_blocks(&points, &blocktree.keys);
 
-        // 6. Refine blocks based on ncrit
-        let map =
-            DistributedTree::split_blocks(&points.iter().map(|p| p.key).collect(), blocktree.keys);
-
-        (points, map)
+        (
+            keys_to_points,
+            points_to_keys
+        )
     }
 
     /// Specialization for balanced trees.
@@ -399,7 +443,7 @@ impl DistributedTree {
         linearized.balance();
 
         // 7.ii Assign the local leaves to the elements of this new balanced tree
-        let points_to_balanced = DistributedTree::assign_nodes_to_leaves(
+        let points_to_balanced = DistributedTree::assign_points_to_nodes(
             &points.iter().map(|p| p.key).collect(),
             &linearized.keys,
         );
@@ -424,7 +468,7 @@ impl DistributedTree {
         tree.linearize();
 
         // 10. Map points to non-overlapping tree
-        let map = DistributedTree::assign_nodes_to_leaves(
+        let map = DistributedTree::assign_points_to_nodes(
             &points.iter().map(|p| p.key).collect(),
             &tree.keys,
         );
@@ -432,356 +476,356 @@ impl DistributedTree {
         (points, map)
     }
 
-    /// Read a DistributedTree from a from a HDF5 file on master process, and redistribute.
-    pub fn read_hdf5(world: &UserCommunicator, filepath: String) -> DistributedTree {
-        let comm = world.duplicate();
-        let rank = comm.rank();
-        let size = comm.size();
+    // /// Read a DistributedTree from a from a HDF5 file on master process, and redistribute.
+    // pub fn read_hdf5(world: &UserCommunicator, filepath: String) -> DistributedTree {
+    //     let comm = world.duplicate();
+    //     let rank = comm.rank();
+    //     let size = comm.size();
 
-        let root_rank = 0;
-        let root_process = comm.process_at_rank(root_rank);
+    //     let root_rank = 0;
+    //     let root_process = comm.process_at_rank(root_rank);
 
-        // Communicate point and key sizes
-        let mut nlocal_keys = 0 as Count;
-        let mut nlocal_points = 0 as Count;
+    //     // Communicate point and key sizes
+    //     let mut nlocal_keys = 0 as Count;
+    //     let mut nlocal_points = 0 as Count;
 
-        if rank == root_rank {
-            let file = hdf5::File::open(&filepath).unwrap();
-            let attr_names = file.attr_names().unwrap();
-            let comm_size: Rank = file.attr("comm_size").unwrap().read_scalar().unwrap();
+    //     if rank == root_rank {
+    //         let file = hdf5::File::open(&filepath).unwrap();
+    //         let attr_names = file.attr_names().unwrap();
+    //         let comm_size: Rank = file.attr("comm_size").unwrap().read_scalar().unwrap();
 
-            // Communicator sizes have to match to replicate tree
-            if comm_size != size {
-                println!("Experiment size doesn't match world size!");
-                comm.abort(1);
-            } else {
-                let global_key_counts: Vec<Count> = file
-                    .dataset("key_counts")
-                    .unwrap()
-                    .read_raw::<Count>()
-                    .unwrap();
-                let global_point_counts: Vec<Count> = file
-                    .dataset("point_counts")
-                    .unwrap()
-                    .read_raw::<Count>()
-                    .unwrap();
+    //         // Communicator sizes have to match to replicate tree
+    //         if comm_size != size {
+    //             println!("Experiment size doesn't match world size!");
+    //             comm.abort(1);
+    //         } else {
+    //             let global_key_counts: Vec<Count> = file
+    //                 .dataset("key_counts")
+    //                 .unwrap()
+    //                 .read_raw::<Count>()
+    //                 .unwrap();
+    //             let global_point_counts: Vec<Count> = file
+    //                 .dataset("point_counts")
+    //                 .unwrap()
+    //                 .read_raw::<Count>()
+    //                 .unwrap();
 
-                // println!("HERE {:?} ", global_point_counts);
-                root_process.scatter_into_root(&global_key_counts, &mut nlocal_keys);
-                root_process.scatter_into_root(&global_point_counts, &mut nlocal_points);
-            }
-        } else {
-            root_process.scatter_into(&mut nlocal_keys);
-            root_process.scatter_into(&mut nlocal_points);
-        }
+    //             // println!("HERE {:?} ", global_point_counts);
+    //             root_process.scatter_into_root(&global_key_counts, &mut nlocal_keys);
+    //             root_process.scatter_into_root(&global_point_counts, &mut nlocal_points);
+    //         }
+    //     } else {
+    //         root_process.scatter_into(&mut nlocal_keys);
+    //         root_process.scatter_into(&mut nlocal_points);
+    //     }
 
-        // Communicate data
-        let mut local_keys: Vec<MortonKey> = vec![MortonKey::default(); nlocal_keys as usize];
-        let mut local_points: Vec<Point> = vec![Point::default(); nlocal_points as usize];
+    //     // Communicate data
+    //     let mut local_keys: Vec<MortonKey> = vec![MortonKey::default(); nlocal_keys as usize];
+    //     let mut local_points: Vec<Point> = vec![Point::default(); nlocal_points as usize];
 
-        // Placeholders for global values
-        let mut balanced = bool::default();
-        let mut global_domain = Domain::default();
+    //     // Placeholders for global values
+    //     let mut balanced = bool::default();
+    //     let mut global_domain = Domain::default();
 
-        if rank == root_rank {
-            let file = hdf5::File::open(&filepath).unwrap();
-            let comm_size: Rank = file.attr("comm_size").unwrap().read_scalar().unwrap();
+    //     if rank == root_rank {
+    //         let file = hdf5::File::open(&filepath).unwrap();
+    //         let comm_size: Rank = file.attr("comm_size").unwrap().read_scalar().unwrap();
 
-            // Communicator sizes have to match to replicate tree
-            if comm_size != size {
-                println!("Experiment size doesn't match world size!");
-                comm.abort(1);
-            } else {
-                // Read global data into master process
-                let global_keys: Vec<MortonKey> = file
-                    .dataset("keys")
-                    .unwrap()
-                    .read_raw::<MortonKey>()
-                    .unwrap();
-                let global_key_counts: Vec<Count> = file
-                    .dataset("key_counts")
-                    .unwrap()
-                    .read_raw::<Count>()
-                    .unwrap();
-                let global_key_displs: Vec<Count> = file
-                    .dataset("key_displs")
-                    .unwrap()
-                    .read_raw::<Count>()
-                    .unwrap();
+    //         // Communicator sizes have to match to replicate tree
+    //         if comm_size != size {
+    //             println!("Experiment size doesn't match world size!");
+    //             comm.abort(1);
+    //         } else {
+    //             // Read global data into master process
+    //             let global_keys: Vec<MortonKey> = file
+    //                 .dataset("keys")
+    //                 .unwrap()
+    //                 .read_raw::<MortonKey>()
+    //                 .unwrap();
+    //             let global_key_counts: Vec<Count> = file
+    //                 .dataset("key_counts")
+    //                 .unwrap()
+    //                 .read_raw::<Count>()
+    //                 .unwrap();
+    //             let global_key_displs: Vec<Count> = file
+    //                 .dataset("key_displs")
+    //                 .unwrap()
+    //                 .read_raw::<Count>()
+    //                 .unwrap();
 
-                let global_points: Vec<Point> =
-                    file.dataset("points").unwrap().read_raw::<Point>().unwrap();
-                let global_point_counts: Vec<Count> = file
-                    .dataset("point_counts")
-                    .unwrap()
-                    .read_raw::<Count>()
-                    .unwrap();
-                let global_point_displs: Vec<Count> = file
-                    .dataset("point_displs")
-                    .unwrap()
-                    .read_raw::<Count>()
-                    .unwrap();
+    //             let global_points: Vec<Point> =
+    //                 file.dataset("points").unwrap().read_raw::<Point>().unwrap();
+    //             let global_point_counts: Vec<Count> = file
+    //                 .dataset("point_counts")
+    //                 .unwrap()
+    //                 .read_raw::<Count>()
+    //                 .unwrap();
+    //             let global_point_displs: Vec<Count> = file
+    //                 .dataset("point_displs")
+    //                 .unwrap()
+    //                 .read_raw::<Count>()
+    //                 .unwrap();
 
-                let domain = file.group("domain").unwrap();
-                let origin: [PointType; 3] = domain
-                    .dataset("origin")
-                    .unwrap()
-                    .read_raw::<PointType>()
-                    .unwrap()[0..3]
-                    .try_into()
-                    .unwrap();
-                let diameter: [PointType; 3] = domain
-                    .dataset("diameter")
-                    .unwrap()
-                    .read_raw::<PointType>()
-                    .unwrap()[0..3]
-                    .try_into()
-                    .unwrap();
+    //             let domain = file.group("domain").unwrap();
+    //             let origin: [PointType; 3] = domain
+    //                 .dataset("origin")
+    //                 .unwrap()
+    //                 .read_raw::<PointType>()
+    //                 .unwrap()[0..3]
+    //                 .try_into()
+    //                 .unwrap();
+    //             let diameter: [PointType; 3] = domain
+    //                 .dataset("diameter")
+    //                 .unwrap()
+    //                 .read_raw::<PointType>()
+    //                 .unwrap()[0..3]
+    //                 .try_into()
+    //                 .unwrap();
 
-                global_domain = Domain { origin, diameter };
-                balanced = file.attr("balanced").unwrap().read_scalar().unwrap();
+    //             global_domain = Domain { origin, diameter };
+    //             balanced = file.attr("balanced").unwrap().read_scalar().unwrap();
 
-                // Distribute tree data to processes in communicator
-                let key_partition =
-                    Partition::new(&global_keys[..], global_key_counts, &global_key_displs[..]);
+    //             // Distribute tree data to processes in communicator
+    //             let key_partition =
+    //                 Partition::new(&global_keys[..], global_key_counts, &global_key_displs[..]);
 
-                let point_partition = Partition::new(
-                    &global_points[..],
-                    global_point_counts,
-                    &global_point_displs[..],
-                );
+    //             let point_partition = Partition::new(
+    //                 &global_points[..],
+    //                 global_point_counts,
+    //                 &global_point_displs[..],
+    //             );
 
-                root_process.scatter_varcount_into_root(&key_partition, &mut local_keys[..]);
-                root_process.scatter_varcount_into_root(&point_partition, &mut local_points[..]);
-            }
-        } else {
-            root_process.scatter_varcount_into(&mut local_keys[..]);
-            root_process.scatter_varcount_into(&mut local_points[..]);
-        }
+    //             root_process.scatter_varcount_into_root(&key_partition, &mut local_keys[..]);
+    //             root_process.scatter_varcount_into_root(&point_partition, &mut local_points[..]);
+    //         }
+    //     } else {
+    //         root_process.scatter_varcount_into(&mut local_keys[..]);
+    //         root_process.scatter_varcount_into(&mut local_points[..]);
+    //     }
 
-        // Broadcast balance information
-        root_process.broadcast_into(&mut balanced);
+    //     // Broadcast balance information
+    //     root_process.broadcast_into(&mut balanced);
 
-        // Broadcast domain
-        root_process.broadcast_into(&mut global_domain);
+    //     // Broadcast domain
+    //     root_process.broadcast_into(&mut global_domain);
 
-        // Generate a local instance of distributed tree
-        let points_to_keys = DistributedTree::assign_nodes_to_leaves(
-            &local_points.iter().map(|p| p.key).collect(),
-            &local_keys,
-        );
+    //     // Generate a local instance of distributed tree
+    //     let points_to_keys = DistributedTree::assign_points_to_nodes(
+    //         &local_points.iter().map(|p| p.key).collect(),
+    //         &local_keys,
+    //     );
 
-        DistributedTree {
-            keys: local_keys,
-            points: local_points,
-            points_to_keys: points_to_keys,
-            balanced: balanced,
-            domain: global_domain,
-        }
-    }
+    //     DistributedTree {
+    //         keys: local_keys,
+    //         points: local_points,
+    //         points_to_keys: points_to_keys,
+    //         balanced: balanced,
+    //         domain: global_domain,
+    //     }
+    // }
 
-    /// Serialize a DistributedTree to HDF5.
-    pub fn write_hdf5(
-        world: &UserCommunicator,
-        filename: String,
-        tree: &DistributedTree,
-    ) -> hdf5::Result<()> {
-        // Communicate global data to root process
-        let comm = world.duplicate();
-        let rank = comm.rank();
-        let size = comm.size();
+    // /// Serialize a DistributedTree to HDF5.
+    // pub fn write_hdf5(
+    //     world: &UserCommunicator,
+    //     filename: String,
+    //     tree: &DistributedTree,
+    // ) -> hdf5::Result<()> {
+    //     // Communicate global data to root process
+    //     let comm = world.duplicate();
+    //     let rank = comm.rank();
+    //     let size = comm.size();
 
-        let root_rank = 0;
-        let root_process = comm.process_at_rank(root_rank);
+    //     let root_rank = 0;
+    //     let root_process = comm.process_at_rank(root_rank);
 
-        // Gather the keys
-        let local_keys = &tree.keys;
-        let local_points = &tree.points;
+    //     // Gather the keys
+    //     let local_keys = &tree.keys;
+    //     let local_points = &tree.points;
 
-        let nlocal_keys: Count = tree.keys.len() as Count;
-        let nlocal_points: Count = tree.points.len() as Count;
+    //     let nlocal_keys: Count = tree.keys.len() as Count;
+    //     let nlocal_points: Count = tree.points.len() as Count;
 
-        let mut global_key_counts: Vec<Count> = vec![0; size as usize];
-        let mut global_point_counts: Vec<Count> = vec![0; size as usize];
+    //     let mut global_key_counts: Vec<Count> = vec![0; size as usize];
+    //     let mut global_point_counts: Vec<Count> = vec![0; size as usize];
 
-        if rank == root_rank {
-            root_process.gather_into_root(&nlocal_keys, &mut global_key_counts[..]);
-            root_process.gather_into_root(&nlocal_points, &mut global_point_counts[..]);
-        } else {
-            root_process.gather_into(&nlocal_keys);
-            root_process.gather_into(&nlocal_points);
-        }
+    //     if rank == root_rank {
+    //         root_process.gather_into_root(&nlocal_keys, &mut global_key_counts[..]);
+    //         root_process.gather_into_root(&nlocal_points, &mut global_point_counts[..]);
+    //     } else {
+    //         root_process.gather_into(&nlocal_keys);
+    //         root_process.gather_into(&nlocal_points);
+    //     }
 
-        // Write to file on root process
-        if rank == root_rank {
-            // Calculate point and key displacements
-            let global_key_displs: Vec<Count> = global_key_counts
-                .iter()
-                .scan(0, |acc, &x| {
-                    let tmp = *acc;
-                    *acc += x;
-                    Some(tmp)
-                })
-                .collect();
+    //     // Write to file on root process
+    //     if rank == root_rank {
+    //         // Calculate point and key displacements
+    //         let global_key_displs: Vec<Count> = global_key_counts
+    //             .iter()
+    //             .scan(0, |acc, &x| {
+    //                 let tmp = *acc;
+    //                 *acc += x;
+    //                 Some(tmp)
+    //             })
+    //             .collect();
 
-            let global_point_displs: Vec<Count> = global_point_counts
-                .iter()
-                .scan(0, |acc, &x| {
-                    let tmp = *acc;
-                    *acc += x;
-                    Some(tmp)
-                })
-                .collect();
+    //         let global_point_displs: Vec<Count> = global_point_counts
+    //             .iter()
+    //             .scan(0, |acc, &x| {
+    //                 let tmp = *acc;
+    //                 *acc += x;
+    //                 Some(tmp)
+    //             })
+    //             .collect();
 
-            // Buffer for global keys
-            let global_key_count: usize = global_key_counts.iter().sum::<Count>() as usize;
-            let mut global_keys: Vec<MortonKey> =
-                vec![MortonKey::default(); global_key_count as usize];
+    //         // Buffer for global keys
+    //         let global_key_count: usize = global_key_counts.iter().sum::<Count>() as usize;
+    //         let mut global_keys: Vec<MortonKey> =
+    //             vec![MortonKey::default(); global_key_count as usize];
 
-            let mut key_partition = PartitionMut::new(
-                &mut global_keys[..],
-                global_key_counts.clone(),
-                &global_key_displs[..],
-            );
-            root_process.gather_varcount_into_root(&local_keys[..], &mut key_partition);
+    //         let mut key_partition = PartitionMut::new(
+    //             &mut global_keys[..],
+    //             global_key_counts.clone(),
+    //             &global_key_displs[..],
+    //         );
+    //         root_process.gather_varcount_into_root(&local_keys[..], &mut key_partition);
 
-            // Buffer for global points
-            let global_point_count: usize = global_point_counts.iter().sum::<Count>() as usize;
-            let mut global_points: Vec<Point> = vec![Point::default(); global_point_count as usize];
+    //         // Buffer for global points
+    //         let global_point_count: usize = global_point_counts.iter().sum::<Count>() as usize;
+    //         let mut global_points: Vec<Point> = vec![Point::default(); global_point_count as usize];
 
-            let mut point_partition = PartitionMut::new(
-                &mut global_points[..],
-                global_point_counts.clone(),
-                &global_point_displs[..],
-            );
-            root_process.gather_varcount_into_root(&local_points[..], &mut point_partition);
+    //         let mut point_partition = PartitionMut::new(
+    //             &mut global_points[..],
+    //             global_point_counts.clone(),
+    //             &global_point_displs[..],
+    //         );
+    //         root_process.gather_varcount_into_root(&local_points[..], &mut point_partition);
 
-            // Write data
-            {
-                // Open file buffer
-                let file = hdf5::File::create(format!("{}.hdf5", filename))?;
+    //         // Write data
+    //         {
+    //             // Open file buffer
+    //             let file = hdf5::File::create(format!("{}.hdf5", filename))?;
 
-                // Write keys
-                let keys = file
-                    .new_dataset::<MortonKey>()
-                    .shape([global_keys.len()])
-                    .create("keys")?;
-                keys.write(&global_keys)?;
+    //             // Write keys
+    //             let keys = file
+    //                 .new_dataset::<MortonKey>()
+    //                 .shape([global_keys.len()])
+    //                 .create("keys")?;
+    //             keys.write(&global_keys)?;
 
-                // Write points
-                let points = file
-                    .new_dataset::<Point>()
-                    .shape([global_points.len()])
-                    .create("points")?;
-                points.write_raw(&global_points)?;
+    //             // Write points
+    //             let points = file
+    //                 .new_dataset::<Point>()
+    //                 .shape([global_points.len()])
+    //                 .create("points")?;
+    //             points.write_raw(&global_points)?;
 
-                // Write balance information as an attribute
-                let attr_builder = file.new_attr::<bool>();
-                let attr = attr_builder.create("balanced")?;
-                attr.write_scalar(&tree.balanced)?;
+    //             // Write balance information as an attribute
+    //             let attr_builder = file.new_attr::<bool>();
+    //             let attr = attr_builder.create("balanced")?;
+    //             attr.write_scalar(&tree.balanced)?;
 
-                // Write world size as an attribute
-                let attr_builder = file.new_attr::<i32>();
-                let attr = attr_builder.create("comm_size")?;
-                attr.write_scalar(&size)?;
+    //             // Write world size as an attribute
+    //             let attr_builder = file.new_attr::<i32>();
+    //             let attr = attr_builder.create("comm_size")?;
+    //             attr.write_scalar(&size)?;
 
-                // Write key partition
-                let key_counts = file
-                    .new_dataset::<Count>()
-                    .shape([global_key_counts.len()])
-                    .create("key_counts")?;
-                key_counts.write(&global_key_counts)?;
+    //             // Write key partition
+    //             let key_counts = file
+    //                 .new_dataset::<Count>()
+    //                 .shape([global_key_counts.len()])
+    //                 .create("key_counts")?;
+    //             key_counts.write(&global_key_counts)?;
 
-                let key_displs = file
-                    .new_dataset::<Count>()
-                    .shape([global_key_displs.len()])
-                    .create("key_displs")?;
-                key_displs.write(&global_key_displs)?;
+    //             let key_displs = file
+    //                 .new_dataset::<Count>()
+    //                 .shape([global_key_displs.len()])
+    //                 .create("key_displs")?;
+    //             key_displs.write(&global_key_displs)?;
 
-                // Write point partition
-                let point_counts = file
-                    .new_dataset::<Count>()
-                    .shape([global_point_counts.len()])
-                    .create("point_counts")?;
-                point_counts.write(&global_point_counts)?;
+    //             // Write point partition
+    //             let point_counts = file
+    //                 .new_dataset::<Count>()
+    //                 .shape([global_point_counts.len()])
+    //                 .create("point_counts")?;
+    //             point_counts.write(&global_point_counts)?;
 
-                let point_displs = file
-                    .new_dataset::<Count>()
-                    .shape([global_point_displs.len()])
-                    .create("point_displs")?;
-                point_displs.write(&global_point_displs)?;
+    //             let point_displs = file
+    //                 .new_dataset::<Count>()
+    //                 .shape([global_point_displs.len()])
+    //                 .create("point_displs")?;
+    //             point_displs.write(&global_point_displs)?;
 
-                // Write domain
-                let domain = file.create_group("domain")?;
-                let origin = domain
-                    .new_dataset::<PointType>()
-                    .shape([3])
-                    .create("origin")?;
-                let diameter = domain
-                    .new_dataset::<PointType>()
-                    .shape([3])
-                    .create("diameter")?;
-                origin.write(&tree.domain.origin)?;
-                diameter.write(&tree.domain.diameter)?;
-            }
-            Ok(())
-        } else {
-            root_process.gather_varcount_into(&local_keys[..]);
-            root_process.gather_varcount_into(&local_points[..]);
-            Ok(())
-        }
-    }
+    //             // Write domain
+    //             let domain = file.create_group("domain")?;
+    //             let origin = domain
+    //                 .new_dataset::<PointType>()
+    //                 .shape([3])
+    //                 .create("origin")?;
+    //             let diameter = domain
+    //                 .new_dataset::<PointType>()
+    //                 .shape([3])
+    //                 .create("diameter")?;
+    //             origin.write(&tree.domain.origin)?;
+    //             diameter.write(&tree.domain.diameter)?;
+    //         }
+    //         Ok(())
+    //     } else {
+    //         root_process.gather_varcount_into(&local_keys[..]);
+    //         root_process.gather_varcount_into(&local_points[..]);
+    //         Ok(())
+    //     }
+    // }
 
-    /// Serialize a DistributedTree's keys to VTK for visualization.
-    pub fn write_vtk(world: &UserCommunicator, filename: String, tree: &DistributedTree) {
-        let comm = world.duplicate();
-        let rank = comm.rank();
-        let size = comm.size();
+    // /// Serialize a DistributedTree's keys to VTK for visualization.
+    // pub fn write_vtk(world: &UserCommunicator, filename: String, tree: &DistributedTree) {
+    //     let comm = world.duplicate();
+    //     let rank = comm.rank();
+    //     let size = comm.size();
 
-        // Communicate global leaves and global domain
-        let root_rank = 0;
-        let root_process = comm.process_at_rank(root_rank);
+    //     // Communicate global leaves and global domain
+    //     let root_rank = 0;
+    //     let root_process = comm.process_at_rank(root_rank);
 
-        // Gather the keys
-        let local_keys = &tree.keys;
+    //     // Gather the keys
+    //     let local_keys = &tree.keys;
 
-        let nlocal_keys: Count = tree.keys.len() as Count;
+    //     let nlocal_keys: Count = tree.keys.len() as Count;
 
-        let mut global_key_counts: Vec<Count> = vec![0; size as usize];
+    //     let mut global_key_counts: Vec<Count> = vec![0; size as usize];
 
-        if rank == root_rank {
-            root_process.gather_into_root(&nlocal_keys, &mut global_key_counts[..]);
-        } else {
-            root_process.gather_into(&nlocal_keys);
-        }
+    //     if rank == root_rank {
+    //         root_process.gather_into_root(&nlocal_keys, &mut global_key_counts[..]);
+    //     } else {
+    //         root_process.gather_into(&nlocal_keys);
+    //     }
 
-        // Write to file on root process
-        if rank == root_rank {
-            // Calculate point and key displacements
-            let global_key_displs: Vec<Count> = global_key_counts
-                .iter()
-                .scan(0, |acc, &x| {
-                    let tmp = *acc;
-                    *acc += x;
-                    Some(tmp)
-                })
-                .collect();
+    //     // Write to file on root process
+    //     if rank == root_rank {
+    //         // Calculate point and key displacements
+    //         let global_key_displs: Vec<Count> = global_key_counts
+    //             .iter()
+    //             .scan(0, |acc, &x| {
+    //                 let tmp = *acc;
+    //                 *acc += x;
+    //                 Some(tmp)
+    //             })
+    //             .collect();
 
-            // Buffer for global keys
-            let global_key_count: usize = global_key_counts.iter().sum::<Count>() as usize;
-            let mut global_keys: Vec<MortonKey> =
-                vec![MortonKey::default(); global_key_count as usize];
+    //         // Buffer for global keys
+    //         let global_key_count: usize = global_key_counts.iter().sum::<Count>() as usize;
+    //         let mut global_keys: Vec<MortonKey> =
+    //             vec![MortonKey::default(); global_key_count as usize];
 
-            let mut key_partition = PartitionMut::new(
-                &mut global_keys[..],
-                global_key_counts.clone(),
-                &global_key_displs[..],
-            );
-            root_process.gather_varcount_into_root(&local_keys[..], &mut key_partition);
+    //         let mut key_partition = PartitionMut::new(
+    //             &mut global_keys[..],
+    //             global_key_counts.clone(),
+    //             &global_key_displs[..],
+    //         );
+    //         root_process.gather_varcount_into_root(&local_keys[..], &mut key_partition);
 
-            global_keys.write_vtk(filename, &tree.domain);
-        } else {
-            root_process.gather_varcount_into(&local_keys[..]);
-        }
-    }
+    //         global_keys.write_vtk(filename, &tree.domain);
+    //     } else {
+    //         root_process.gather_varcount_into(&local_keys[..]);
+    //     }
+    // }
 }
