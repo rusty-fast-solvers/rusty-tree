@@ -11,7 +11,7 @@ use rusty_tree::{
     types::{domain::Domain, morton::MortonKey},
 };
 
-const NPOINTS: u64 = 100000;
+const NPOINTS: u64 = 50;
 
 /// Test fixture for NPOINTS randomly distributed points.
 fn points_fixture() -> Vec<[f64; 3]> {
@@ -162,10 +162,11 @@ fn main() {
 
     // Distributed Trees
     let unbalanced = unbalanced_tree_fixture(&world);
-    let balanced = balanced_tree_fixture(&world);
+    // let balanced = balanced_tree_fixture(&world);
 
-    // // Tests for the unbalanced tree
-    // test_ncrit(&unbalanced.points_to_keys);
+
+    // Tests for the unbalanced tree
+    // // test_ncrit(&unbalanced.points_to_keys);
     // println!("test_ncrit ... passed for unbalanced trees");
 
     // test_span(&unbalanced.points_to_keys);
