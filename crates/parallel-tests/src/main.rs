@@ -11,7 +11,7 @@ use rusty_tree::{
     types::{domain::Domain, morton::{MortonKey, MortonKeys}, point::{Point, Points}},
 };
 
-const NPOINTS: u64 = 100;
+const NPOINTS: u64 = 5000;
 
 /// Test fixture for NPOINTS randomly distributed points.
 fn points_fixture() -> Vec<[f64; 3]> {
@@ -60,6 +60,7 @@ fn test_span(tree: &MortonKeys) {
     let max_level = tree.iter().map(|block| block.level()).max().unwrap();
 
     // Generate a uniform tree at the max level, and filter for range in this processor
+    
     let mut level = 0;
     let mut uniform = vec![ROOT];
     while level < max_level {
@@ -96,10 +97,10 @@ fn test_span(tree: &MortonKeys) {
 }
 
 /// Test that the leaves on separate nodes do not overlap.
-fn test_no_overlaps(world: &SystemCommunicator, tree: &HashMap<MortonKey, MortonKey>) {
+fn test_no_overlaps(world: &SystemCommunicator, tree: &HashMap<MortonKey, Points>) {
     // Communicate bounds from each process
-    let max = tree.iter().map(|(_, block)| block).max().unwrap();
-    let min = *tree.iter().map(|(_, block)| block).min().unwrap();
+    let max = tree.iter().map(|(block, _)| block).max().unwrap();
+    let min = *tree.iter().map(|(block, _)| block).min().unwrap();
 
     // Gather all bounds at root
     let size = world.size();
@@ -154,7 +155,6 @@ fn main() {
     let unbalanced = unbalanced_tree_fixture(&world);
     let balanced = balanced_tree_fixture(&world);
 
-
     // Tests for the unbalanced tree
     test_ncrit(&unbalanced.keys_to_points);
     if rank == 0 {
@@ -166,10 +166,10 @@ fn main() {
         println!("test_span ... passed for unbalanced trees");
     }
 
-    // test_no_overlaps(&world, &unbalanced.points_to_keys);
-    // if rank == 0 {
-    //     println!("test_no_overlaps ... passed for unbalanced trees");
-    // }
+    test_no_overlaps(&world, &unbalanced.keys_to_points);
+    if rank == 0 {
+        println!("test_no_overlaps ... passed for unbalanced trees");
+    }
 
     // Tests for the balanced tree
     test_ncrit(&balanced.keys_to_points);
@@ -177,17 +177,19 @@ fn main() {
         println!("test_ncrit ... passed for balanced trees");
     }
 
-    // test_span(&balanced.points_to_keys);
-    // println!("test_span ... passed for unbalanced trees");
+    test_span(&balanced.keys);
+    if rank == 0 {
+        println!("test_span ... passed for balanced trees");
+    }
 
-    // test_no_overlaps(&world, &balanced.points_to_keys);
-    // if rank == 0 {
-    //     println!("test_no_overlaps ... passed for balanced trees");
-    // }
+    test_no_overlaps(&world, &balanced.keys_to_points);
+    if rank == 0 {
+        println!("test_no_overlaps ... passed for balanced trees");
+    }
 
-    // // Other parallel functionality
-    // test_global_bounds(&world);
-    // if rank == 0 {
-    //     println!("test_global_bounds ... passed");
-    // }
+    // Other parallel functionality
+    test_global_bounds(&world);
+    if rank == 0 {
+        println!("test_global_bounds ... passed");
+    }
 }
