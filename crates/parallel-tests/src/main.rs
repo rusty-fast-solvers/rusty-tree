@@ -8,7 +8,7 @@ use rand::SeedableRng;
 use rusty_tree::{
     constants::{NCRIT, ROOT},
     distributed::DistributedTree,
-    types::{domain::Domain, morton::{MortonKey, MortonKeys}, point::{Point, Points}},
+    types::{domain::Domain, morton::{MortonKey, MortonKeys}, point::{Points}},
 };
 
 const NPOINTS: u64 = 5000;

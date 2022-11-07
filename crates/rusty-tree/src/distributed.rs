@@ -4,7 +4,6 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 
 use mpi::{
-    collective::SystemOperation,
     datatype::{Partition, PartitionMut},
     topology::{Rank, UserCommunicator},
     traits::*,
@@ -15,7 +14,7 @@ use hyksort::hyksort::hyksort;
 
 use crate::{
     constants::{K, NCRIT, ROOT},
-    data::{HDF5, JSON, VTK},
+    data::VTK,
     single_node::Tree,
     types::{
         domain::Domain,
@@ -52,7 +51,8 @@ impl DistributedTree {
         balanced: bool,
         world: &UserCommunicator,
     ) -> DistributedTree {
-        let domain = Domain::from_global_points(&points, world);
+        
+        let domain = Domain::from_global_points(points, world);
 
         if balanced {
             let (keys, points, points_to_keys, keys_to_points) = DistributedTree::balanced_tree(world, points, &domain);
@@ -409,7 +409,7 @@ impl DistributedTree {
                                     .map(|p| Point {
                                         coordinate: p.coordinate,
                                         global_idx: p.global_idx,
-                                        key: *points_to_keys.get(&p).unwrap()
+                                        key: *points_to_keys.get(p).unwrap()
                                     })
                                     .collect();
                                     
@@ -425,7 +425,7 @@ impl DistributedTree {
         balanced.linearize();
        
         // 4. Find final bidirectional maps to non-overlapping tree
-        let mut points: Points = points
+        let points: Points = points
                                     .iter()
                                     .map(|p| Point {
                                         coordinate: p.coordinate,
@@ -436,7 +436,7 @@ impl DistributedTree {
         let points_to_keys = DistributedTree::assign_points_to_nodes(&points, &balanced);
         let keys_to_points = DistributedTree::assign_nodes_to_points(&balanced, &points);
 
-        let mut keys: MortonKeys = keys_to_points.iter().map(|(key, _)| key.clone()).collect();
+        let mut keys: MortonKeys = keys_to_points.keys().cloned().collect(); 
         keys.sort();
         (
             keys,
@@ -456,12 +456,11 @@ impl DistributedTree {
         let root_process = comm.process_at_rank(root_rank);
 
         // Communicate point and key sizes
-        let mut nlocal_keys = 0 as Count;
-        let mut nlocal_points = 0 as Count;
+        let mut nlocal_keys = 0_i32;
+        let mut nlocal_points = 0_i32;
 
         if rank == root_rank {
             let file = hdf5::File::open(&filepath).unwrap();
-            let attr_names = file.attr_names().unwrap();
             let comm_size: Rank = file.attr("comm_size").unwrap().read_scalar().unwrap();
 
             // Communicator sizes have to match to replicate tree
@@ -590,12 +589,12 @@ impl DistributedTree {
         );
 
         DistributedTree {
-            balanced: balanced,
+            balanced,
             points: local_points,
             keys: local_keys,
             domain: global_domain,
-            points_to_keys: points_to_keys,
-            keys_to_points: keys_to_points,
+            points_to_keys,
+            keys_to_points,
         }
     }
 

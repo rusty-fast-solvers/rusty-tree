@@ -476,10 +476,10 @@ impl VTK for Vec<MortonKey> {
                 points: IOBuffer::F64(cell_points),
                 cells: Cells {
                     cell_verts: VertexNumbers::XML {
-                        connectivity: connectivity,
-                        offsets: offsets,
+                        connectivity,
+                        offsets,
                     },
-                    types: types,
+                    types,
                 },
                 data: Attributes {
                     point: vec![],

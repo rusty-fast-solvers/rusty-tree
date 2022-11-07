@@ -11,10 +11,9 @@ use mpi::{
     Address,
 };
 use serde::{Deserialize, Serialize};
-use vtkio::Vtk;
 
 use crate::{
-    data::{HDF5, JSON, VTK},
+    data::{HDF5, JSON},
     types::morton::{KeyType, MortonKey},
 };
 
