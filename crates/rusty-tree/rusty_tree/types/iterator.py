@@ -146,6 +146,7 @@ class Iterator:
         """Printing to stdout forces a copy."""
         return str(self._clone(0, len(self)))
 
+    #TODO: Investigate why calling this multiple times results in a double free error.
     @property
     def head(self):
         """Return head of iterator, wrapped in a new compatible Python type."""
