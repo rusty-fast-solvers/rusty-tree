@@ -425,9 +425,6 @@ impl DistributedTree {
         balanced.linearize();
        
         // 4. Find final bidirectional maps to non-overlapping tree
-        let points_to_keys = DistributedTree::assign_points_to_nodes(&points, &balanced);
-        let keys_to_points = DistributedTree::assign_nodes_to_points(&balanced, &points);
-
         let mut points: Points = points
                                     .iter()
                                     .map(|p| Point {
@@ -436,6 +433,8 @@ impl DistributedTree {
                                         key: MortonKey::from_point(&p.coordinate, domain) 
                                     })
                                     .collect();
+        let points_to_keys = DistributedTree::assign_points_to_nodes(&points, &balanced);
+        let keys_to_points = DistributedTree::assign_nodes_to_points(&balanced, &points);
 
         let mut keys: MortonKeys = keys_to_points.iter().map(|(key, _)| key.clone()).collect();
         keys.sort();

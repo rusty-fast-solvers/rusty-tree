@@ -6,6 +6,8 @@ import numpy as np
 
 from rusty_tree import lib, ffi
 from rusty_tree.types.iterator import Iterator
+from rusty_tree.types.morton import MortonKey
+from rusty_tree.types.point import Point
 
 
 class DistributedTree:
@@ -14,7 +16,6 @@ class DistributedTree:
     distributed via MPI from a set of N distributed Cartesian points with shape
     (N,3) stored in NumPy arrays on each processor. Trees can optionally be
     balanced.
-
     """
 
     def __init__(self, p_tree, comm, p_comm, raw_comm):
@@ -48,6 +49,20 @@ class DistributedTree:
         self.comm = comm
         self.p_comm = p_comm
         self.raw_comm = raw_comm
+
+    def __getitem__(self, key):
+        if isinstance(key, Point):
+            return MortonKey(lib.distributed_tree_points_to_keys_get(self.ctype, key.ctype))
+        
+        elif isinstance(key, MortonKey):
+            n_points = lib.distributed_tree_keys_to_npoints_get(self.ctype, key.ctype)
+            ptr = lib.distributed_tree_keys_to_points_get(self.ctype, key.ctype)
+            return Iterator.from_points(ptr, n_points)
+
+        else:
+            raise TypeError(
+                "Invalid key type {}, only Point or MortonKey accepted".format(type(key))
+                )
 
     @classmethod
     def from_global_points(cls, points, balanced, comm):
