@@ -8,10 +8,10 @@ use rand::SeedableRng;
 use rusty_tree::{
     constants::{NCRIT, ROOT},
     distributed::DistributedTree,
-    types::{domain::Domain, morton::MortonKey},
+    types::{domain::Domain, morton::{MortonKey, MortonKeys}, point::{Points}},
 };
 
-const NPOINTS: u64 = 100000;
+const NPOINTS: u64 = 5000;
 
 /// Test fixture for NPOINTS randomly distributed points.
 fn points_fixture() -> Vec<[f64; 3]> {
@@ -46,30 +46,21 @@ fn balanced_tree_fixture(world: &SystemCommunicator) -> DistributedTree {
 }
 
 /// Test that the tree satisfies the ncrit condition.
-fn test_ncrit(tree: &HashMap<MortonKey, MortonKey>) {
-    let mut blocks_to_points: HashMap<MortonKey, usize> = HashMap::new();
-
-    for block in tree.values() {
-        if !blocks_to_points.contains_key(block) {
-            blocks_to_points.insert(*block, 1);
-        } else if let Some(b) = blocks_to_points.get_mut(block) {
-            *b += 1;
-        }
-    }
-
-    for &count in blocks_to_points.values() {
-        assert!(count <= NCRIT);
+fn test_ncrit(tree: &HashMap<MortonKey, Points>) {
+    for points in tree.values() {
+        assert!(points.len() <= NCRIT);
     }
 }
 
 /// Test that the tree spans the entire domain specified by the point distribution.
-fn test_span(tree: &HashMap<MortonKey, MortonKey>) {
-    let min = tree.iter().map(|(_, block)| block).min().unwrap();
-    let max = tree.iter().map(|(_, block)| block).max().unwrap();
-    let block_set: HashSet<MortonKey> = tree.iter().map(|(_, block)| *block).collect();
-    let max_level = tree.iter().map(|(_, block)| block.level()).max().unwrap();
+fn test_span(tree: &MortonKeys) {
+    let min = tree.iter().min().unwrap();
+    let max = tree.iter().max().unwrap();
+    let block_set: HashSet<MortonKey> = tree.iter().cloned().collect();
+    let max_level = tree.iter().map(|block| block.level()).max().unwrap();
 
     // Generate a uniform tree at the max level, and filter for range in this processor
+    
     let mut level = 0;
     let mut uniform = vec![ROOT];
     while level < max_level {
@@ -90,26 +81,26 @@ fn test_span(tree: &HashMap<MortonKey, MortonKey>) {
         .filter(|node| min <= node && node <= max)
         .collect();
 
+
     // Test that each member of the uniform tree, or their ancestors are contained within the
     // tree.
     for node in uniform.iter() {
         let ancestors = node.ancestors();
 
-        let int: Vec<MortonKey> = ancestors
+        let int: MortonKeys = ancestors
             .intersection(&block_set)
             .into_iter()
             .cloned()
             .collect();
-
         assert!(int.iter().len() > 0);
     }
 }
 
 /// Test that the leaves on separate nodes do not overlap.
-fn test_no_overlaps(world: &SystemCommunicator, tree: &HashMap<MortonKey, MortonKey>) {
+fn test_no_overlaps(world: &SystemCommunicator, tree: &HashMap<MortonKey, Points>) {
     // Communicate bounds from each process
-    let max = tree.iter().map(|(_, block)| block).max().unwrap();
-    let min = *tree.iter().map(|(_, block)| block).min().unwrap();
+    let max = tree.iter().map(|(block, _)| block).max().unwrap();
+    let min = *tree.iter().map(|(block, _)| block).min().unwrap();
 
     // Gather all bounds at root
     let size = world.size();
@@ -165,25 +156,33 @@ fn main() {
     let balanced = balanced_tree_fixture(&world);
 
     // Tests for the unbalanced tree
-    test_ncrit(&unbalanced.points_to_keys);
-    println!("test_ncrit ... passed for unbalanced trees");
+    test_ncrit(&unbalanced.keys_to_points);
+    if rank == 0 {
+        println!("test_ncrit ... passed for unbalanced trees");
+    }
 
-    test_span(&unbalanced.points_to_keys);
-    println!("test_span ... passed for unbalanced trees");
+    test_span(&unbalanced.keys);
+    if rank == 0 {
+        println!("test_span ... passed for unbalanced trees");
+    }
 
-    test_no_overlaps(&world, &unbalanced.points_to_keys);
+    test_no_overlaps(&world, &unbalanced.keys_to_points);
     if rank == 0 {
         println!("test_no_overlaps ... passed for unbalanced trees");
     }
 
     // Tests for the balanced tree
-    test_ncrit(&balanced.points_to_keys);
-    println!("test_ncrit ... passed for unbalanced trees");
+    test_ncrit(&balanced.keys_to_points);
+    if rank == 0 {
+        println!("test_ncrit ... passed for balanced trees");
+    }
 
-    test_span(&balanced.points_to_keys);
-    println!("test_span ... passed for unbalanced trees");
+    test_span(&balanced.keys);
+    if rank == 0 {
+        println!("test_span ... passed for balanced trees");
+    }
 
-    test_no_overlaps(&world, &balanced.points_to_keys);
+    test_no_overlaps(&world, &balanced.keys_to_points);
     if rank == 0 {
         println!("test_no_overlaps ... passed for balanced trees");
     }

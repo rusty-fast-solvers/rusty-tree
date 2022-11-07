@@ -82,25 +82,6 @@ impl Domain {
 
         let min_origin = [min_x, min_y, min_z];
 
-        // Find maximum origin
-        let max_x = buffer
-            .iter()
-            .max_by(|a, b| a.origin[0].partial_cmp(&b.origin[0]).unwrap())
-            .unwrap()
-            .origin[0];
-        let max_y = buffer
-            .iter()
-            .max_by(|a, b| a.origin[1].partial_cmp(&b.origin[1]).unwrap())
-            .unwrap()
-            .origin[1];
-        let max_z = buffer
-            .iter()
-            .max_by(|a, b| a.origin[2].partial_cmp(&b.origin[2]).unwrap())
-            .unwrap()
-            .origin[2];
-
-        let max_origin = [max_x, max_y, max_z];
-
         // Find maximum diameter (+max origin)
         let max_x = buffer
             .iter()

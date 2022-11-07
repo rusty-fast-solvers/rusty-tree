@@ -1,5 +1,5 @@
 use std::time::Instant;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 
 use mpi::{topology::SystemCommunicator, traits::*};
 use mpi::collective::{SystemOperation};
@@ -9,9 +9,7 @@ use rand::prelude::*;
 use rand::SeedableRng;
 
 use rusty_tree::{
-    constants::{NCRIT, ROOT},
     distributed::DistributedTree,
-    types::{domain::Domain, morton::MortonKey},
 };
 
 const NPOINTS: u64 = 100000;
@@ -66,7 +64,8 @@ fn main() {
         world
             .process_at_rank(root_rank)
             .reduce_into_root(&nleaves, &mut sum, SystemOperation::sum());
-        /// universe size, number of leaves, total runtime, encoding time, sorting time
+        
+        // universe size, number of leaves, total runtime, encoding time, sorting time
         println!(
             "{:?}, {:?}, {:?}",
             size,

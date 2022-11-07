@@ -41,6 +41,10 @@ pub struct MortonKey {
     pub morton: KeyType,
 }
 
+
+/// Vector of **MortonKeys**.
+pub type MortonKeys = Vec<MortonKey>;
+
 unsafe impl Equivalence for MortonKey {
     type Out = UserDatatype;
     fn equivalent_datatype() -> Self::Out {
@@ -472,10 +476,10 @@ impl VTK for Vec<MortonKey> {
                 points: IOBuffer::F64(cell_points),
                 cells: Cells {
                     cell_verts: VertexNumbers::XML {
-                        connectivity: connectivity,
-                        offsets: offsets,
+                        connectivity,
+                        offsets,
                     },
-                    types: types,
+                    types,
                 },
                 data: Attributes {
                     point: vec![],

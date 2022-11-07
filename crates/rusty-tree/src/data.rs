@@ -4,13 +4,11 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::path::Path;
 
-use std::iter::FromIterator;
-use std::path::PathBuf;
 use vtkio::model::*;
 
 use serde::Serialize;
 
-use crate::types::{domain::Domain, morton::MortonKey, point::PointType};
+use crate::types::{domain::Domain};
 
 // VTK compatible dataset for visualization
 pub trait VTK {
